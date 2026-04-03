@@ -63,8 +63,8 @@ window.dispatchEvent(new Event('firebase-ready'));
   --ok:         #2e7d32; --ok-l:#e8f5e9; --ok-m:#43a047;
   --warn:       #e65100; --warn-l:#fff3e0; --warn-m:#fb8c00;
   --err:        #c62828; --err-l:#ffebee; --err-m:#e53935;
-  --font:       'Barlow', sans-serif;
-  --cond:       'Barlow Condensed', sans-serif;
+  --font:       'Open Sans', sans-serif;
+  --cond:       'Outfit', sans-serif;
   --r:          4px;
   --sh:         0 1px 8px rgba(30,37,48,.08);
   --sh2:        0 4px 24px rgba(30,37,48,.13);
@@ -165,7 +165,7 @@ input,select,textarea{font-family:inherit}
 /* ── MODAL LOGIN ─────────────────────────────── */
 .overlay{position:fixed;inset:0;background:rgba(30,37,48,.55);backdrop-filter:blur(4px);z-index:900;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease}
 .overlay.open{opacity:1;pointer-events:all}
-.modal{background:white;border-radius:8px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(30,37,48,.25);transform:translateY(16px);transition:transform .2s ease;position:relative;border-top:4px solid var(--green)}
+.modal{background:white;border-radius:8px;padding:40px 36px 54px;width:100%;max-width:420px;min-height:360px;box-shadow:0 20px 60px rgba(30,37,48,.25);transform:translateY(16px);transition:transform .2s ease;position:relative;border-top:4px solid var(--green)}
 .overlay.open .modal{transform:translateY(0)}
 .modal.border-blue{border-top-color:var(--blue)}
 .modal.border-dark{border-top-color:var(--charcoal)}
@@ -179,7 +179,7 @@ input,select,textarea{font-family:inherit}
 .field label{display:block;font-size:.72rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--steel);margin-bottom:6px}
 .field input{width:100%;padding:10px 13px;border:1px solid var(--mist);border-radius:var(--r);color:var(--charcoal);font-size:.9rem;background:var(--cloud);outline:none;transition:border-color var(--tr),background var(--tr)}
 .field input:focus{border-color:var(--green);background:white;box-shadow:0 0 0 3px rgba(76,175,26,.1)}
-.btn-login-submit{width:100%;padding:11px;border-radius:var(--r);font-family:var(--cond);font-size:.95rem;font-weight:700;color:white;letter-spacing:.3px;transition:filter var(--tr),transform var(--tr);margin-top:4px}
+.btn-login-submit{width:100%;padding:11px;border-radius:var(--r);font-family:var(--cond);font-size:.95rem;font-weight:700;color:white;letter-spacing:.3px;transition:filter var(--tr),transform var(--tr);margin-top:8px;margin-bottom:18px}
 .btn-login-submit:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .modal-err{margin-top:12px;padding:9px 12px;background:var(--err-l);border:1px solid rgba(198,40,40,.2);border-radius:var(--r);color:var(--err);font-size:.8rem;display:none}
 .modal-spinner{display:none;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:.82rem;color:var(--slate)}
@@ -379,56 +379,55 @@ td input:focus,td select:focus{border-color:var(--blue-dark);background:white}
 }
 html,body{font-family:var(--font);background:var(--cloud);}
 h1,h2,h3,h4,.hero-title,.page-title,.modal-title,.hc-title,.dsh-t,.nav-link,.btn,.hero-nav a,.hero-portal,.hero-pill,.app-wave-title,.home-section-title{font-family:var(--cond);}
-#home-page{display:none;min-height:100vh;background:var(--cloud);}
-#home-page .utility-bar,#app .utility-bar{display:none !important;}
-.hero-shell{position:relative;min-height:680px;color:#fff;overflow:hidden;background-image:linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18)),url('https://enviro-step.ca/wp-content/uploads/2025/12/IMG_0472-scaled.jpg');background-size:cover;background-position:center;background-repeat:no-repeat;}
-.hero-shell::after{content:'';position:absolute;left:-2%;right:-2%;bottom:-1px;height:100px;background:var(--cloud);z-index:2;clip-path:polygon(0 46%,12% 48%,24% 54%,37% 63%,50% 67%,63% 61%,76% 53%,88% 48%,100% 46%,100% 100%,0 100%);}
-.hero-inner{position:relative;z-index:3;width:min(1440px,calc(100% - 72px));margin:0 auto;padding-top:22px;}
-.hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;}
-.hero-brand img{width:250px;max-width:100%;display:block;filter:none !important;}
-.hero-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:4px;justify-content:flex-end;}
-.hero-pill,.hero-portal{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border-radius:999px;color:#fff;border:3px solid rgba(255,255,255,.95);font-size:18px;font-weight:500;background:var(--green);box-shadow:none;}
-.hero-portal{background:var(--blue);}
-.hero-flag{width:34px;height:24px;border:2px solid rgba(255,255,255,.8);border-radius:2px;background:linear-gradient(90deg,#fff 0 27%,#e41d24 27% 73%,#fff 73%);position:relative;display:inline-block;}
-.hero-flag::after{content:'✶';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;}
-.hero-line{margin-top:16px;height:4px;background:var(--green);}
-.hero-nav{display:flex;justify-content:flex-end;align-items:center;gap:28px;padding-top:22px;flex-wrap:wrap;color:#fff;}
-.hero-nav a{font-size:18px;font-weight:500;text-shadow:0 2px 8px rgba(0,0,0,.28);color:#fff;}
-.hero-nav .dd::after{content:'⌄';margin-left:6px;font-size:13px;vertical-align:3px;}
-.hero-title-wrap{text-align:center;padding-top:110px;}
-.hero-title{margin:0;font-size:clamp(52px,6vw,84px);line-height:1;font-weight:700;letter-spacing:-.03em;text-shadow:0 10px 30px rgba(0,0,0,.24);color:#fff;}
-.home-app-zone{position:relative;z-index:4;padding:60px 0 80px;background:var(--cloud);}
-.home-panel{width:min(1380px,calc(100% - 64px));margin:0 auto;background:transparent;}
-.home-panel .page-header{display:none;}
-.home-intro-card{background:var(--white);border:1px solid var(--mist);border-top:3px solid var(--green);border-radius:var(--r);box-shadow:var(--sh);padding:22px 26px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
-.home-section-title{font-size:30px;font-weight:800;color:#222;}
-.home-section-sub{font-size:12px;color:#999;}
-.hero-card-grid{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;}
-.hero-access-card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);border-top:3px solid var(--mist);padding:26px 22px;width:260px;cursor:pointer;transition:box-shadow .2s ease,transform .2s ease;}
-.hero-access-card:hover{box-shadow:var(--sh2);transform:translateY(-3px);}
-.hero-access-card.asm{border-top-color:var(--green);}
-.hero-access-card.dist{border-top-color:var(--blue);}
-.hero-access-card.admin{border-top-color:var(--charcoal);}
-.hero-access-icon{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
-.hero-access-card.asm .hero-access-icon{background:var(--green-pale);color:var(--green);}
-.hero-access-card.dist .hero-access-icon{background:var(--blue-pale);color:var(--blue);}
-.hero-access-card.admin .hero-access-icon{background:#eef2f7;color:var(--charcoal);}
-.hero-access-icon svg{width:19px;height:19px;fill:currentColor;}
-.hero-access-title{font-size:16px;font-weight:700;color:#222;margin-bottom:6px;font-family:var(--cond);}
-.hero-access-desc{font-size:12px;color:#555;line-height:1.55;margin-bottom:16px;}
-.hero-access-btn{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:8px 16px;border:2px solid var(--green);border-radius:var(--r);background:transparent;color:var(--green);font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;transition:all .2s ease;font-family:var(--font);}
-.hero-access-btn:hover{background:var(--green);color:#fff;}
-.hero-access-card.dist .hero-access-btn{border-color:var(--blue);color:var(--blue);}
-.hero-access-card.dist .hero-access-btn:hover{background:var(--blue);color:#fff;}
-.hero-access-card.admin .hero-access-btn{border-color:var(--charcoal);color:var(--charcoal);}
-.hero-access-card.admin .hero-access-btn:hover{background:var(--charcoal);color:#fff;}
-.home-secondary-actions{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;}
-.home-secondary-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 20px;background:var(--white);border:1px solid var(--mist);border-radius:var(--r);box-shadow:var(--sh);color:#555;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s ease;min-width:190px;justify-content:center;}
-.home-secondary-btn:hover{border-color:var(--green);color:var(--green);box-shadow:var(--sh2);}
-.home-secondary-btn svg{width:13px;height:13px;fill:currentColor;opacity:.6;}
-.home-footer-bar{background:var(--white);border-top:1px solid var(--mist);padding:10px 26px;display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
-.home-footer-bar span{font-size:11px;color:#999;}
-#app{display:none;flex-direction:column;min-height:100vh;background:var(--cloud);}
+#home-page{display:none;min-height:100vh;background:var(--cloud);} 
+.container{width:min(1440px,calc(100% - 72px));margin:0 auto}
+.hero{position:relative;min-height:680px;color:#fff;overflow:hidden;background-image:linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0.2)),url("https://enviro-step.ca/wp-content/uploads/2025/12/IMG_0472-scaled.jpg");background-size:cover;background-position:center;background-repeat:no-repeat;}
+.hero::after{content:"";position:absolute;left:-2%;right:-2%;bottom:-1px;height:100px;background:var(--cloud);z-index:2;clip-path:polygon(0 46%,12% 48%,24% 54%,37% 63%,50% 67%,63% 61%,76% 53%,88% 48%,100% 46%,100% 100%,0 100%)}
+.hi{position:relative;z-index:3;padding-top:22px}
+.ht{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.brand img{width:250px;max-width:100%;display:block}
+.qa{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:4px;justify-content:flex-end}
+.pill,.cb{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 24px;border:3px solid rgba(255,255,255,.95);color:#fff;border-radius:999px;font-size:18px;font-weight:500}
+.pill{background:var(--green)}
+.cb{background:var(--blue)}
+.flag{width:34px;height:24px;border:2px solid rgba(255,255,255,.8);border-radius:2px;background:linear-gradient(90deg,#fff 0 27%,#e41d24 27% 73%,#fff 73%);position:relative}
+.flag::after{content:'✶';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px}
+.hl{margin-top:16px;height:4px;background:var(--green)}
+.mn{display:flex;justify-content:flex-end;align-items:center;gap:28px;padding-top:22px;flex-wrap:wrap;color:#fff}
+.mn a{font-size:18px;font-weight:500;text-shadow:0 2px 8px rgba(0,0,0,.28);color:#fff}
+.mn .dd::after{content:'⌄';margin-left:6px;font-size:13px;vertical-align:3px}
+.htt{text-align:center;padding-top:120px}
+.htt h1{margin:0;font-size:clamp(52px,6vw,84px);line-height:1;font-weight:700;letter-spacing:-.03em;text-shadow:0 10px 30px rgba(0,0,0,.24)}
+.czone{position:relative;z-index:4;padding:60px 0 80px;background:var(--cloud)}
+.home-panel{width:min(1380px,calc(100% - 64px));margin:0 auto;font-family:var(--font);color:var(--charcoal);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh2);position:relative;background:var(--cloud)}
+.home-intro-card{background:var(--white);border-bottom:3px solid var(--green);padding:22px 26px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.home-section-title{font-size:21px;font-weight:800;color:#222}
+.home-section-sub{font-size:12px;color:#999;margin-top:3px}
+.hero-card-grid{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:24px auto 16px;padding:0 24px}
+.hero-access-card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);border-top:3px solid var(--mist);padding:26px 22px;width:260px;min-height:214px;cursor:pointer;transition:box-shadow .2s ease,transform .2s ease}
+.hero-access-card:hover{box-shadow:var(--sh2);transform:translateY(-3px)}
+.hero-access-card.asm{border-top-color:var(--green)}
+.hero-access-card.dist{border-top-color:var(--blue)}
+.hero-access-icon{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.hero-access-card.asm .hero-access-icon{background:var(--green-pale)}
+.hero-access-card.dist .hero-access-icon{background:var(--blue-pale)}
+.hero-access-card.asm .hero-access-icon svg{fill:var(--green)}
+.hero-access-card.dist .hero-access-icon svg{fill:var(--blue)}
+.hero-access-icon svg{width:19px;height:19px}
+.hero-access-title{font-size:16px;font-weight:700;color:#222;margin-bottom:6px}
+.hero-access-desc{font-size:12px;color:#555;line-height:1.55;margin-bottom:16px}
+.hero-access-btn{display:inline-flex;align-items:center;width:100%;padding:7px 16px;border:2px solid var(--green);border-radius:var(--r);background:transparent;color:var(--green);font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;transition:all .2s ease;justify-content:center}
+.hero-access-card.dist .hero-access-btn{border-color:var(--blue);color:var(--blue)}
+.hero-access-card:hover .hero-access-btn{background:var(--green);color:#fff}
+.hero-access-card.dist:hover .hero-access-btn{background:var(--blue);color:#fff}
+.home-secondary-actions{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:14px 24px 20px;margin-top:6px}
+.home-secondary-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 20px;background:var(--white);border:1px solid var(--mist);border-radius:var(--r);box-shadow:var(--sh);color:#555;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s ease;width:260px;min-height:46px;justify-content:center}
+.home-secondary-btn:hover{border-color:var(--green);color:var(--green);box-shadow:var(--sh2)}
+.home-secondary-btn svg{width:13px;height:13px;fill:currentColor;opacity:.6}
+.home-footer-bar{background:var(--white);border-top:1px solid var(--mist);padding:10px 26px;display:flex;justify-content:space-between}
+.home-footer-bar span{font-size:11px;color:#999}
+@media(max-width:1100px){.pill,.cb{font-size:16px;min-height:48px;padding:0 20px}.container{width:min(1440px,calc(100% - 40px));}}
+@media(max-width:900px){.hero{min-height:580px}.ht,.mn{justify-content:center}.brand{width:100%;display:flex;justify-content:center}.htt{padding-top:90px}.qa{justify-content:center}.home-panel{width:min(1380px,calc(100% - 32px));}.home-footer-bar{padding:10px 16px;flex-direction:column;gap:6px}.navbar{padding-left:16px!important;padding-right:16px!important;} .hero-card-grid{gap:12px}.hero-access-card{width:100%;max-width:280px}}
 #app .navbar{background:var(--white);border-bottom:1px solid var(--mist);padding:0 26px;display:flex;align-items:center;height:58px;box-shadow:0 2px 8px rgba(0,0,0,.05);position:sticky;top:0;z-index:500;}
 #app .nav-logo img{height:36px;width:auto;object-fit:contain;}
 #app .nav-link{padding:5px 12px;border-radius:var(--r);font-size:12px;font-weight:700;color:#555;cursor:pointer;transition:all .2s ease;border-bottom:2px solid transparent;letter-spacing:.3px;text-transform:uppercase;}
@@ -496,31 +495,33 @@ tbody tr:hover{background:#f8fbf5;}
 
 <!-- ═══════════════════ PAGE ACCUEIL ═══════════════════════ -->
 <div id="home-page" style="display:none">
-  <section class="hero-shell">
-    <div class="hero-inner">
-      <div class="hero-top">
-        <a href="#" class="hero-brand"><img src="data:image/png;base64,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" alt="Enviro-STEP"/></a>
-        <div class="hero-actions">
-          <a href="#" class="hero-pill">Support technique</a>
-          <a href="#" class="hero-pill">Documentation</a>
-          <a href="#" class="hero-pill">Portail HK</a>
-          <a href="#" class="hero-portal">Nous contacter</a>
-          <span class="hero-flag"></span>
+  <section class="hero">
+    <div class="container hi">
+      <div class="ht">
+        <a href="#" class="brand"><img src="https://enviro-step.ca/wp-content/uploads/2025/12/Nouveau-logo.png" alt="Enviro-STEP"/></a>
+        <div class="qa">
+          <a href="#" class="pill">Support technique</a>
+          <a href="#" class="pill">Avis d'installation</a>
+          <a href="#" class="pill">Portail municipal</a>
+          <a href="#" class="pill">Portail traçabilité HK</a>
+          <a href="#" class="pill">Paiement en ligne</a>
+          <span class="flag"></span>
         </div>
       </div>
-      <div class="hero-line"></div>
-      <nav class="hero-nav">
+      <div class="hl"></div>
+      <nav class="mn">
         <a href="#" class="dd">Types d'applications</a>
         <a href="#" class="dd">Produits</a>
         <a href="#">Documentation</a>
         <a href="#" class="dd">À propos</a>
         <a href="#">Emplois</a>
+        <a href="#" class="cb">Nous contacter</a>
       </nav>
-      <div class="hero-title-wrap"><h1 class="hero-title">Suivi des assemblages</h1></div>
+      <div class="htt"><h1>Suivi des assemblages</h1></div>
     </div>
   </section>
 
-  <main class="home-app-zone">
+  <main class="czone">
     <div class="home-panel">
       <div class="home-intro-card">
         <div>
@@ -529,7 +530,7 @@ tbody tr:hover{background:#f8fbf5;}
         </div>
       </div>
 
-      <div class="hero-card-grid" style="grid-template-columns:repeat(2,minmax(280px,1fr));max-width:620px;margin:0 auto;">
+      <div class="hero-card-grid" style="max-width:620px;margin:0 auto;">
         <div class="hero-access-card asm" onclick="openLogin('assembleur')">
           <div class="hero-access-icon"><svg viewBox="0 0 24 24"><path d="M22 9V7h-2V5c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2v-2h-2V9h2zm-4 10H4V5h14v14z"/></svg></div>
           <div class="hero-access-title">Assembleur</div>
