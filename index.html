@@ -534,14 +534,12 @@ td input:focus,td select:focus{border-color:var(--blue-dark);background:white}
 let FB;
 window.addEventListener('firebase-ready', async () => {
   FB = window.FB;
-  await FB.seedAdmin();
   hideLoading();
   document.getElementById('home-page').style.display = 'flex';
   document.getElementById('home-page').style.flexDirection = 'column';
   document.getElementById('home-date').textContent =
     new Date().toLocaleDateString('fr-CA',{year:'numeric',month:'long',day:'numeric'});
 
-  // Auth state listener
   FB.onAuthStateChanged(FB.auth, async (user) => {
     if(!user && session){
       toast('Session expirée — reconnectez-vous','warn');
