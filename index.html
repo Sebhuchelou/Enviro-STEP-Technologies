@@ -10,7 +10,7 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -29,27 +29,14 @@ const auth    = getAuth(app);
 // ─── Expose to global scope ───────────────────────────────────────────────
 window.FB = {
   db, auth,
-  collection, doc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, orderBy, serverTimestamp,
+  collection, doc, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc,
+  onSnapshot, query, where, orderBy, serverTimestamp,
   signInWithEmailAndPassword, signOut, onAuthStateChanged
 };
 
 // ─── Seed admin user on first load ───────────────────────────────────────
 // Will create default admin in Firestore users collection if missing
-window.FB.seedAdmin = async () => {
-  try {
-    const snap = await getDocs(collection(db, 'users'));
-    if(snap.empty){
-      await setDoc(doc(db,'users','admin-default'), {
-        nom:'Huchelou', prenom:'Sébastien', compagnie:'Enviro-STEP',
-        role:'administrateur', ville:'Québec',
-        email:'sebhuchelou@gmail.com',
-        createdAt: serverTimestamp()
-      });
-      console.log('Admin seed created');
-    }
-  } catch(e){ console.log('Seed skipped:', e.message); }
-};
+window.FB.seedAdmin = async () => true;
 
 window.dispatchEvent(new Event('firebase-ready'));
 </script>
@@ -540,6 +527,7 @@ window.addEventListener('firebase-ready', async () => {
   document.getElementById('home-date').textContent =
     new Date().toLocaleDateString('fr-CA',{year:'numeric',month:'long',day:'numeric'});
 
+  // Auth state listener
   FB.onAuthStateChanged(FB.auth, async (user) => {
     if(!user && session){
       toast('Session expirée — reconnectez-vous','warn');
@@ -646,19 +634,35 @@ async function doLogin(){
   btn.disabled=true;
 
   try {
-    // 1. Firebase Auth sign in
     const cred = await FB.signInWithEmailAndPassword(FB.auth, email, pass);
-
-    // 2. Fetch user profile from Firestore
-    const usersSnap = await FB.getDocs(FB.collection(FB.db,'users'));
     let userDoc = null;
-    usersSnap.forEach(d=>{
-      if(d.data().email && d.data().email.toLowerCase()===email) userDoc={id:d.id,...d.data()};
-    });
+
+    // 1) Preferred path: profile stored under users/{uid}
+    const userRef = FB.doc(FB.db,'users',cred.user.uid);
+    const userSnap = await FB.getDoc(userRef);
+    if(userSnap.exists()){
+      userDoc = { id:userSnap.id, ...userSnap.data() };
+    }
+
+    // 2) Backward-compatible fallback: look up by email, then self-heal to users/{uid}
+    if(!userDoc){
+      const legacySnap = await FB.getDocs(
+        FB.query(FB.collection(FB.db,'users'), FB.where('email','==',email))
+      );
+      if(!legacySnap.empty){
+        const legacyDoc = legacySnap.docs[0];
+        userDoc = { id:cred.user.uid, ...legacyDoc.data() };
+        await FB.setDoc(userRef, {
+          ...legacyDoc.data(),
+          email,
+          updatedAt: FB.serverTimestamp()
+        }, { merge:true });
+      }
+    }
 
     if(!userDoc){
       await FB.signOut(FB.auth);
-      errEl.textContent='Profil utilisateur introuvable. Contactez l\'administrateur.';
+      errEl.textContent='Profil utilisateur introuvable. Vérifiez que le document users/'+cred.user.uid+' existe dans Firestore.';
       errEl.style.display='block';
       spinner.style.display='none'; btn.disabled=false; return;
     }
@@ -670,7 +674,7 @@ async function doLogin(){
       spinner.style.display='none'; btn.disabled=false; return;
     }
 
-    session={...userDoc, uid: cred.user.uid};
+    session={...userDoc, uid: cred.user.uid, id: cred.user.uid};
     closeLogin();
     document.getElementById('home-page').style.display='none';
     document.getElementById('app').style.display='flex';
@@ -1295,7 +1299,7 @@ async function saveUserForm(){
       const data=await resp.json();
       if(data.error){toast('Erreur création compte: '+data.error.message,'err');setSyncing(false);return}
       // Save profile in Firestore
-      await FB.addDoc(FB.collection(FB.db,'users'),{nom,prenom,compagnie:co,role,ville,email,createdAt:FB.serverTimestamp()});
+      await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
       toast('Utilisateur créé avec succès');
     } else {
       // Update Firestore profile only
