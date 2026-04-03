@@ -189,7 +189,7 @@ input,select,textarea{font-family:inherit}
 /* ── APP ─────────────────────────────────────── */
 #app{display:none;flex-direction:column;min-height:100vh}
 
-/* ── PAGE HEADER ─────────────────────────────── 
+/* ── PAGE HEADER ─────────────────────────────── */
 .main{flex:1;padding:28px 40px;background:var(--cloud)}
 .page-header{margin-bottom:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .page-title{font-family:var(--cond);font-size:1.6rem;font-weight:700;color:var(--charcoal);letter-spacing:.2px}
@@ -530,7 +530,7 @@ tbody tr:hover{background:#f8fbf5;}
         </div>
       </div>
 
-      <div class="hero-card-grid" style="max-width:620px;margin:20 auto;">
+      <div class="hero-card-grid" style="max-width:620px;margin:0 auto;">
         <div class="hero-access-card asm" onclick="openLogin('assembleur')">
           <div class="hero-access-icon"><svg viewBox="0 0 24 24"><path d="M22 9V7h-2V5c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2v-2h-2V9h2zm-4 10H4V5h14v14z"/></svg></div>
           <div class="hero-access-title">Assembleur</div>
@@ -632,7 +632,34 @@ tbody tr:hover{background:#f8fbf5;}
 </div>
 
 <!-- ═══════════════════ APP ═════════════════════════════════ -->
-<div id="app">
+<div id="app" class="app-shell">
+  <section class="hero app-hero">
+    <div class="container hi">
+      <div class="ht">
+        <a href="#" class="brand"><img src="https://enviro-step.ca/wp-content/uploads/2025/12/Nouveau-logo.png" alt="Enviro-STEP"/></a>
+        <div class="qa">
+          <a href="#" class="pill">Support technique</a>
+          <a href="#" class="pill">Avis d'installation</a>
+          <a href="#" class="pill">Portail municipal</a>
+          <a href="#" class="pill">Portail traçabilité HK</a>
+          <a href="#" class="pill">Paiement en ligne</a>
+          <span class="flag"></span>
+        </div>
+      </div>
+      <div class="hl"></div>
+      <nav class="mn">
+        <a href="#" class="dd">Types d'applications</a>
+        <a href="#" class="dd">Produits</a>
+        <a href="#">Documentation</a>
+        <a href="#" class="dd">À propos</a>
+        <a href="#">Emplois</a>
+        <a href="#" class="cb">Nous contacter</a>
+      </nav>
+      <div class="htt"><h1 id="app-hero-title">Espace utilisateur</h1></div>
+    </div>
+  </section>
+  <div class="app-czone">
+  <div class="app-panel">
   <div class="utility-bar">
     <span id="app-util-info">HK Tracker</span>
     <div class="utility-sep"></div>
@@ -652,6 +679,39 @@ tbody tr:hover{background:#f8fbf5;}
     <button class="btn-deconnexion" onclick="doLogout()">Déconnexion</button>
   </nav>
   <main class="main" id="app-main"></main>
+  </div>
+  </div>
+
+  <section class="footer-wrap">
+    <div class="footer-cta">
+      <div><h2>Vous souhaitez lancer votre projet ?</h2>
+      <p>Nos conseillers sont là pour répondre à vos questions et à vous orienter dans la conception de votre projet.</p></div>
+      <form class="footer-form">
+        <input class="footer-input" type="text" placeholder="Nom"/>
+        <input class="footer-input" type="text" placeholder="Numéro de téléphone"/>
+        <div class="footer-select-wrap"><select class="footer-select"><option>Région</option><option>Capitale-Nationale</option><option>Chaudière-Appalaches</option><option>Montréal</option></select></div>
+        <div class="footer-send"><button class="footer-send-btn" type="button">Envoyer</button></div>
+      </form>
+    </div>
+    <div class="footer-social-bar">
+      <h3>Suivez-nous sur</h3>
+      <div class="footer-social-icons"><a href="#" class="footer-social-icon">f</a><a href="#" class="footer-social-icon">in</a><a href="#" class="footer-social-icon">▶</a></div>
+    </div>
+  </section>
+  <footer class="site-footer">
+    <div class="site-footer-grid">
+      <div class="site-footer-brand"><img src="https://enviro-step.ca/wp-content/uploads/2025/10/Refont-logo.png" alt="Enviro-STEP"/></div>
+      <div><div class="site-footer-col-title">NOUS JOINDRE</div><div class="site-footer-col"><p><a href="tel:+14186264040">+ 1 (418) 626-4040</a></p><p>Sans frais :</p><p><a href="tel:+18779257496">+ 1 877 925-7496</a></p></div></div>
+      <div><div class="site-footer-col-title">NOTRE HORAIRE</div><div class="site-footer-col"><p>Du lundi au jeudi : de 8h à 17h</p><p>Le vendredi : de 8h à 16h</p><p>Le samedi et dimanche : fermé</p></div></div>
+      <div>
+        <div class="site-footer-col-title">MENU</div>
+        <div class="site-footer-links"><a href="#">Accueil</a><a href="#">Avis d'installation</a><a href="#">Support Technique</a><a href="#">Distributeurs</a><a href="#">Nous contacter</a><a href="#">Paiement en ligne</a></div>
+        <a href="#" class="site-footer-faq">FAQ</a>
+      </div>
+    </div>
+    <div class="site-footer-bottom"><span>© 2026 Enviro-STEP Technologies Inc.</span><span>|</span><a href="#">Conditions générales</a><span>|</span><a href="#">Politique de cookies</a><span>|</span><a href="#">Politique de confidentialités</a></div>
+    <a href="#top" class="site-footer-top">⌃</a>
+  </footer>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -739,6 +799,18 @@ document.getElementById('conf-yes').onclick=()=>{closeConfirm();if(confirmCb)con
 // ════════════════════════════════════════════════════════
 // LOGIN / LOGOUT
 // ════════════════════════════════════════════════════════
+
+function setAppHeroTitle(){
+  const map={
+    administrateur:'Espace Administrateur',
+    assembleur:'Espace Assembleur',
+    distributeur:'Espace Distributeur',
+    conseiller:'Espace Conseiller'
+  };
+  const el=document.getElementById('app-hero-title');
+  if(el) el.textContent = map[(session&&session.role)||pendingRole] || 'Espace utilisateur';
+}
+
 const ROLE_META={
   assembleur:   {title:'Espace Assembleur',   sub:'Réservé aux assembleurs autorisés',       color:'#4caf1a', modal:''},
   distributeur: {title:'Espace Distributeur', sub:'Réservé aux distributeurs autorisés',     color:'#1b5fa8', modal:'border-blue'},
@@ -850,6 +922,7 @@ function goHome(){
 // APP SETUP + REALTIME LISTENERS
 // ════════════════════════════════════════════════════════
 function setupApp(){
+  setAppHeroTitle();
   const ac={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#6d28d9'};
   const dc={administrateur:'#1e2530',assembleur:'#4caf1a',distributeur:'#1b5fa8',conseiller:'#7c3aed'};
   const init=(session.prenom||'?')[0]+(session.nom||'?')[0];
