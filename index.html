@@ -57,12 +57,7 @@ window.dispatchEvent(new Event('firebase-ready'));
   --steel:      #4a5568;
   --slate:      #718096;
   --silver:     #a0aec0;
-  --mist:       #e2e8f0;  
-  --footer-blue: #1b5e99;
-  --footer-green: #7ac143;
-  --footer-light: #f2f5f8;
-  --footer-text: #1f2d3d;
-  --footer-white: #ffffff;
+  --mist:       #e2e8f0;
   --cloud:      #f7f9fb;
   --white:      #ffffff;
   --ok:         #2e7d32; --ok-l:#e8f5e9; --ok-m:#43a047;
@@ -194,7 +189,7 @@ input,select,textarea{font-family:inherit}
 /* ── APP ─────────────────────────────────────── */
 #app{display:none;flex-direction:column;min-height:100vh}
 
-/* ── PAGE HEADER ─────────────────────────────── */
+/* ── PAGE HEADER ─────────────────────────────── 
 .main{flex:1;padding:28px 40px;background:var(--cloud)}
 .page-header{margin-bottom:22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .page-title{font-family:var(--cond);font-size:1.6rem;font-weight:700;color:var(--charcoal);letter-spacing:.2px}
@@ -367,43 +362,6 @@ td input:focus,td select:focus{border-color:var(--blue-dark);background:white}
 @keyframes hlRow{0%{background:var(--green-pale)}100%{background:transparent}}
 .row-new{animation:hlRow 2.5s ease}
 
-
-
-/* FOOTER SITE */
-.fctaw{background:linear-gradient(180deg,var(--lt) 0 44%,var(--lt2) 44%);padding-top:18px}
-.fcta{width:min(1230px,calc(100% - 72px));margin:0 0 0 auto;background:var(--sb);color:#fff;border-radius:110px 0 0 110px;padding:40px 34px 32px 66px;display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:center}
-.fcta h2{margin:0 0 12px;font-size:52px;line-height:1.02;font-weight:700;letter-spacing:-.03em;max-width:500px}
-.fcta p{margin:0;font-size:18px;line-height:1.45}
-.cform{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-.ci,.cs{width:100%;min-height:52px;border:0;outline:0;border-radius:999px;background:#efefef;color:#0b4f93;padding:0 22px;font-family:inherit;font-size:17px;font-weight:500}
-.csw{grid-column:1/-1;position:relative}
-.cs{appearance:none;color:#1d1d1d;padding-right:46px}
-.csw::after{content:'⌄';position:absolute;right:20px;top:50%;transform:translateY(-54%);color:#1d1d1d;font-size:18px;pointer-events:none}
-.csend{grid-column:1/-1;display:flex;justify-content:flex-end}
-.sndbtn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 26px;border-radius:999px;border:3px solid rgba(255,255,255,.95);background:transparent;color:#fff;font-family:inherit;font-size:18px;font-weight:600;cursor:pointer}
-.sbar{width:min(540px,calc(100% - 72px));margin:0 0 0 auto;background:var(--sg);color:#fff;border-radius:0 0 0 70px;display:flex;align-items:center;justify-content:center;gap:24px;padding:18px 24px}
-.sbar h3{margin:0;font-size:30px;line-height:1.1;font-weight:500}
-.sicons{display:flex;gap:16px}
-.sicon{width:48px;height:48px;border-radius:7px;background:#fff;color:var(--sg);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;line-height:1}
-.sfoot{background:var(--lt2);padding:60px 0 26px;position:relative}
-.fgrid{width:min(1600px,calc(100% - 72px));margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr 1fr 1.15fr;gap:50px;align-items:start}
-.fbrand{padding-top:54px}
-.fbrand img{width:320px}
-.fcolt{width:100%;background:var(--sb);color:#fff;text-align:center;border-radius:10px;padding:11px 13px;font-size:17px;font-weight:500;text-transform:uppercase;margin-bottom:32px;letter-spacing:.02em}
-.fcol{font-size:22px;line-height:1.9;color:var(--sg)}
-.fcol a{color:var(--sg)}
-.fcol p{margin:0 0 12px}
-.fmlinks{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;font-size:22px;line-height:1.6}
-.fmlinks a{color:var(--sg)}
-.faqlink{display:block;text-align:center;margin-top:18px;font-size:22px;color:var(--sg)}
-.fbot{width:min(1600px,calc(100% - 72px));margin:50px auto 0;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 24px;color:var(--sb);font-size:17px;text-align:center}
-.fbot a{color:var(--sb)}
-.backtop{position:absolute;right:22px;bottom:80px;width:50px;height:50px;border-radius:6px;background:var(--sg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
-
-@media(max-width:1100px){.fcta h2{font-size:42px}.fgrid{grid-template-columns:1fr 1fr;gap:40px}.fbrand{grid-column:1/-1;padding-top:0}}
-@media(max-width:900px){.fcta{margin:0 auto;border-radius:34px;grid-template-columns:1fr;padding:30px 24px}.sbar{margin:0 auto;border-radius:0 0 24px 24px;flex-wrap:wrap}.fgrid{grid-template-columns:1fr}.hero{min-height:580px}.ht,.mn{justify-content:center}.brand{width:100%;display:flex;justify-content:center}.htt{padding-top:90px}}
-@media(max-width:640px){.fcta h2{font-size:30px}.cform{grid-template-columns:1fr}}
-
 @media(max-width:900px){
   .utility-bar,.navbar,.main{padding-left:16px;padding-right:16px}
   .hero-cards{grid-template-columns:1fr;max-width:300px}
@@ -526,62 +484,7 @@ tbody tr:hover{background:#f8fbf5;}
 
 </style>
 </head>
-<body id="top">
-
-/* ══════════════════════════════════════════════
-   FOOTER — FORCER LES COULEURS ENVIRO-STEP
-══════════════════════════════════════════════ */
-
-.fctaw{
-  background: linear-gradient(180deg, #ececec 0 44%, #e5e5e5 44%) !important;
-}
-
-.fcta{
-  background: var(--footer-blue) !important;
-  color: var(--footer-white) !important;
-}
-
-.sbar{
-  background: var(--footer-green) !important;
-  color: var(--footer-white) !important;
-}
-
-.sfoot{
-  background: #e5e5e5 !important;
-}
-
-.fcolt{
-  background: var(--footer-blue) !important;
-  color: var(--footer-white) !important;
-}
-
-.fcol,
-.fcol a,
-.fmlinks a,
-.faqlink{
-  color: var(--footer-green) !important;
-}
-
-.fbot,
-.fbot a{
-  color: var(--footer-blue) !important;
-}
-
-.backtop{
-  background: var(--footer-green) !important;
-  color: #fff !important;
-}
-
-.ci,
-.cs{
-  background: #efefef !important;
-  color: var(--footer-blue) !important;
-}
-
-.sndbtn{
-  border-color: rgba(255,255,255,.95) !important;
-  color: #fff !important;
-}
+<body>
 
 <!-- LOADING SCREEN -->
 <div id="loading-screen">
@@ -627,7 +530,7 @@ tbody tr:hover{background:#f8fbf5;}
         </div>
       </div>
 
-      <div class="hero-card-grid" style="max-width:620px;margin:0 auto;">
+      <div class="hero-card-grid" style="max-width:620px;margin:20 auto;">
         <div class="hero-access-card asm" onclick="openLogin('assembleur')">
           <div class="hero-access-icon"><svg viewBox="0 0 24 24"><path d="M22 9V7h-2V5c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2v-2h-2V9h2zm-4 10H4V5h14v14z"/></svg></div>
           <div class="hero-access-title">Assembleur</div>
@@ -729,34 +632,7 @@ tbody tr:hover{background:#f8fbf5;}
 </div>
 
 <!-- ═══════════════════ APP ═════════════════════════════════ -->
-<div id="app" class="app-shell">
-  <section class="hero app-hero">
-    <div class="container hi">
-      <div class="ht">
-        <a href="#" class="brand"><img src="https://enviro-step.ca/wp-content/uploads/2025/12/Nouveau-logo.png" alt="Enviro-STEP"/></a>
-        <div class="qa">
-          <a href="#" class="pill">Support technique</a>
-          <a href="#" class="pill">Avis d'installation</a>
-          <a href="#" class="pill">Portail municipal</a>
-          <a href="#" class="pill">Portail traçabilité HK</a>
-          <a href="#" class="pill">Paiement en ligne</a>
-          <span class="flag"></span>
-        </div>
-      </div>
-      <div class="hl"></div>
-      <nav class="mn">
-        <a href="#" class="dd">Types d'applications</a>
-        <a href="#" class="dd">Produits</a>
-        <a href="#">Documentation</a>
-        <a href="#" class="dd">À propos</a>
-        <a href="#">Emplois</a>
-        <a href="#" class="cb">Nous contacter</a>
-      </nav>
-      <div class="htt"><h1 id="app-hero-title">Espace utilisateur</h1></div>
-    </div>
-  </section>
-  <div class="app-czone">
-  <div class="app-panel">
+<div id="app">
   <div class="utility-bar">
     <span id="app-util-info">HK Tracker</span>
     <div class="utility-sep"></div>
@@ -776,76 +652,9 @@ tbody tr:hover{background:#f8fbf5;}
     <button class="btn-deconnexion" onclick="doLogout()">Déconnexion</button>
   </nav>
   <main class="main" id="app-main"></main>
-  </div>
-  </div>
-
-  <section class="footer-wrap">
-    <div class="footer-cta">
-      <div><h2>Vous souhaitez lancer votre projet ?</h2>
-      <p>Nos conseillers sont là pour répondre à vos questions et à vous orienter dans la conception de votre projet.</p></div>
-      <form class="footer-form">
-        <input class="footer-input" type="text" placeholder="Nom"/>
-        <input class="footer-input" type="text" placeholder="Numéro de téléphone"/>
-        <div class="footer-select-wrap"><select class="footer-select"><option>Région</option><option>Capitale-Nationale</option><option>Chaudière-Appalaches</option><option>Montréal</option></select></div>
-        <div class="footer-send"><button class="footer-send-btn" type="button">Envoyer</button></div>
-      </form>
-    </div>
-    <div class="footer-social-bar">
-      <h3>Suivez-nous sur</h3>
-      <div class="footer-social-icons"><a href="#" class="footer-social-icon">f</a><a href="#" class="footer-social-icon">in</a><a href="#" class="footer-social-icon">▶</a></div>
-    </div>
-  </section>
-  <footer class="site-footer">
-    <div class="site-footer-grid">
-      <div class="site-footer-brand"><img src="https://enviro-step.ca/wp-content/uploads/2025/10/Refont-logo.png" alt="Enviro-STEP"/></div>
-      <div><div class="site-footer-col-title">NOUS JOINDRE</div><div class="site-footer-col"><p><a href="tel:+14186264040">+ 1 (418) 626-4040</a></p><p>Sans frais :</p><p><a href="tel:+18779257496">+ 1 877 925-7496</a></p></div></div>
-      <div><div class="site-footer-col-title">NOTRE HORAIRE</div><div class="site-footer-col"><p>Du lundi au jeudi : de 8h à 17h</p><p>Le vendredi : de 8h à 16h</p><p>Le samedi et dimanche : fermé</p></div></div>
-      <div>
-        <div class="site-footer-col-title">MENU</div>
-        <div class="site-footer-links"><a href="#">Accueil</a><a href="#">Avis d'installation</a><a href="#">Support Technique</a><a href="#">Distributeurs</a><a href="#">Nous contacter</a><a href="#">Paiement en ligne</a></div>
-        <a href="#" class="site-footer-faq">FAQ</a>
-      </div>
-    </div>
-    <div class="site-footer-bottom"><span>© 2026 Enviro-STEP Technologies Inc.</span><span>|</span><a href="#">Conditions générales</a><span>|</span><a href="#">Politique de cookies</a><span>|</span><a href="#">Politique de confidentialités</a></div>
-    <a href="#top" class="site-footer-top">⌃</a>
-  </footer>
 </div>
 
 <div class="toast" id="toast"></div>
-
-
-
-<!-- FOOTER -->
-<section class="fctaw">
-  <div class="fcta">
-    <div><h2>Vous souhaitez lancer votre projet ?</h2>
-    <p>Nos conseillers sont là pour répondre à vos questions et à vous orientez dans la conception de votre projet</p></div>
-    <form class="cform">
-      <input class="ci" type="text" placeholder="Nom"/>
-      <input class="ci" type="text" placeholder="Numéro de téléphone"/>
-      <div class="csw"><select class="cs"><option>Région</option><option>Capitale-Nationale</option><option>Chaudière-Appalaches</option><option>Montréal</option></select></div>
-      <div class="csend"><button class="sndbtn" type="button">Envoyer</button></div>
-    </form>
-  </div>
-  <div class="sbar">
-    <h3>Suivez-nous sur</h3>
-    <div class="sicons"><a href="#" class="sicon">f</a><a href="#" class="sicon">in</a><a href="#" class="sicon">▶</a></div>
-  </div>
-</section>
-<footer class="sfoot">
-  <div class="fgrid">
-    <div class="fbrand"><img src="https://enviro-step.ca/wp-content/uploads/2025/10/Refont-logo.png" alt="Enviro-STEP"/></div>
-    <div><div class="fcolt">NOUS JOINDRE</div><div class="fcol"><p><a href="tel:+14186264040">+ 1 (418) 626-4040</a></p><p>Sans frais :</p><p><a href="tel:+18779257496">+ 1 877 925-7496</a></p></div></div>
-    <div><div class="fcolt">NOTRE HORAIRE</div><div class="fcol"><p>Du lundi au jeudi : de 8h à 17h</p><p>Le vendredi : de 8h à 16h</p><p>Le samedi et dimanche : fermé</p></div></div>
-    <div>
-      <div class="fcolt">MENU</div>
-      <div class="fmlinks"><a href="#">Accueil</a><a href="#">Avis d'installation</a><a href="#">Support Technique</a><a href="#">Distributeurs</a><a href="#">Nous contacter</a><a href="#">Paiement en ligne</a></div>
-      <a href="#" class="faqlink">FAQ</a>
-    </div>
-  </div>
-  <div class="fbot"><span>© 2026 Enviro-STEP Technologies Inc.</span><span>|</span><a href="#">Conditions générales</a><span>|</span><a href="#">Politique de cookies</a><span>|</span><a href="#">Politique de confidentialités</a></div>
-  <a href="#top" class="backtop">⌃</a>
-</footer>
 
 <script>
 // ════════════════════════════════════════════════════════
@@ -930,18 +739,6 @@ document.getElementById('conf-yes').onclick=()=>{closeConfirm();if(confirmCb)con
 // ════════════════════════════════════════════════════════
 // LOGIN / LOGOUT
 // ════════════════════════════════════════════════════════
-
-function setAppHeroTitle(){
-  const map={
-    administrateur:'Espace Administrateur',
-    assembleur:'Espace Assembleur',
-    distributeur:'Espace Distributeur',
-    conseiller:'Espace Conseiller'
-  };
-  const el=document.getElementById('app-hero-title');
-  if(el) el.textContent = map[(session&&session.role)||pendingRole] || 'Espace utilisateur';
-}
-
 const ROLE_META={
   assembleur:   {title:'Espace Assembleur',   sub:'Réservé aux assembleurs autorisés',       color:'#4caf1a', modal:''},
   distributeur: {title:'Espace Distributeur', sub:'Réservé aux distributeurs autorisés',     color:'#1b5fa8', modal:'border-blue'},
@@ -1053,7 +850,6 @@ function goHome(){
 // APP SETUP + REALTIME LISTENERS
 // ════════════════════════════════════════════════════════
 function setupApp(){
-  setAppHeroTitle();
   const ac={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#6d28d9'};
   const dc={administrateur:'#1e2530',assembleur:'#4caf1a',distributeur:'#1b5fa8',conseiller:'#7c3aed'};
   const init=(session.prenom||'?')[0]+(session.nom||'?')[0];
