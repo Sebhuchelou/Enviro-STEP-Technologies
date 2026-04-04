@@ -481,18 +481,39 @@ tbody tr:hover{background:#f8fbf5;}
 .modal-spinner{padding:0 26px 0;margin-top:12px;font-size:12px;color:#555;}
 @media(max-width:1100px){.hero-pill,.hero-portal{font-size:16px;min-height:48px;padding:0 20px}.hero-inner{width:min(1440px,calc(100% - 40px));}}
 @media(max-width:900px){.hero-shell{min-height:580px}.hero-top,.hero-nav{justify-content:center}.hero-brand{width:100%;display:flex;justify-content:center}.hero-title-wrap{padding-top:90px}.hero-actions{justify-content:center}.page-header{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}.main{padding:16px}.hero-card-grid{gap:12px}.hero-access-card{width:100%;max-width:280px}.home-panel{width:min(1380px,calc(100% - 32px));}.home-footer-bar{padding:10px 16px;flex-direction:column;gap:6px}.navbar{padding-left:16px!important;padding-right:16px!important;}}
-.fctaw{margin-top:80px}
-.fcta{display:flex;justify-content:space-between;align-items:center;padding:50px;border-radius:40px;background:#1b5e99;color:#fff}
-.cform{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-.ci,.cs{padding:12px;border-radius:20px;border:none}
-.sndbtn{padding:12px 30px;border-radius:25px;background:transparent;border:2px solid #fff;color:#fff}
-.sbar{margin-top:-40px;padding:20px 40px;background:#7ac143;border-radius:0 0 40px 40px;color:#fff;display:flex;justify-content:space-between;align-items:center}
-.sfoot{background:#e5e5e5;padding:50px 20px}
-.fgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:30px}
-.fcolt{background:#1b5e99;color:#fff;padding:10px;border-radius:10px;text-align:center;margin-bottom:10px}
-.fcol,.fcol a,.fmlinks a,.faqlink{color:#7ac143;text-decoration:none}
-.fbot{margin-top:30px;text-align:center;color:#1b5e99}
-.backtop{position:fixed;bottom:20px;right:20px;background:#7ac143;color:#fff;padding:10px 15px;border-radius:10px;text-decoration:none}
+/* ── FOOTER SITE ──────────────────────────────────────── */
+.fctaw{background:linear-gradient(180deg,#f2f5f8 0 44%,#e8ecf0 44%);padding-top:18px}
+.fcta{width:min(1230px,calc(100% - 72px));margin:0 0 0 auto;background:#1b5e99;color:#fff;border-radius:110px 0 0 110px;padding:40px 34px 32px 66px;display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:center}
+.fcta h2{margin:0 0 12px;font-size:52px;line-height:1.02;font-weight:700;letter-spacing:-.03em;max-width:500px}
+.fcta p{margin:0;font-size:18px;line-height:1.45}
+.cform{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.ci,.cs{width:100%;min-height:52px;border:0;outline:0;border-radius:999px;background:#efefef;color:#0b4f93;padding:0 22px;font-family:inherit;font-size:17px;font-weight:500}
+.csw{grid-column:1/-1;position:relative}
+.cs{appearance:none;color:#1d1d1d;padding-right:46px}
+.csw::after{content:'⌄';position:absolute;right:20px;top:50%;transform:translateY(-54%);color:#1d1d1d;font-size:18px;pointer-events:none}
+.csend{grid-column:1/-1;display:flex;justify-content:flex-end}
+.sndbtn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 26px;border-radius:999px;border:3px solid rgba(255,255,255,.95);background:transparent;color:#fff;font-family:inherit;font-size:18px;font-weight:600;cursor:pointer}
+.sbar{width:min(540px,calc(100% - 72px));margin:0 0 0 auto;background:#7ac143;color:#fff;border-radius:0 0 0 70px;display:flex;align-items:center;justify-content:center;gap:24px;padding:18px 24px}
+.sbar h3{margin:0;font-size:30px;line-height:1.1;font-weight:500}
+.sicons{display:flex;gap:16px}
+.sicon{width:48px;height:48px;border-radius:7px;background:#fff;color:#7ac143;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;line-height:1;text-decoration:none}
+.sfoot{background:#e8ecf0;padding:60px 0 26px;position:relative}
+.fgrid{width:min(1600px,calc(100% - 72px));margin:0 auto;display:grid;grid-template-columns:1.05fr 1fr 1fr 1.15fr;gap:50px;align-items:start}
+.fbrand{padding-top:54px}
+.fbrand img{width:320px}
+.fcolt{width:100%;background:#1b5e99;color:#fff;text-align:center;border-radius:10px;padding:11px 13px;font-size:17px;font-weight:500;text-transform:uppercase;margin-bottom:32px;letter-spacing:.02em}
+.fcol{font-size:22px;line-height:1.9;color:#7ac143}
+.fcol a{color:#7ac143;text-decoration:none}
+.fcol p{margin:0 0 12px}
+.fmlinks{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;font-size:22px;line-height:1.6}
+.fmlinks a{color:#7ac143;text-decoration:none}
+.faqlink{display:block;text-align:center;margin-top:18px;font-size:22px;color:#7ac143;text-decoration:none}
+.fbot{width:min(1600px,calc(100% - 72px));margin:50px auto 0;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 24px;color:#1b5e99;font-size:17px;text-align:center}
+.fbot a{color:#1b5e99;text-decoration:none}
+.backtop{position:absolute;right:22px;bottom:80px;width:50px;height:50px;border-radius:6px;background:#7ac143;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;text-decoration:none}
+@media(max-width:1100px){.fcta h2{font-size:42px}.fgrid{grid-template-columns:1fr 1fr;gap:40px}.fbrand{grid-column:1/-1;padding-top:0}}
+@media(max-width:900px){.fcta{margin:0 auto;border-radius:34px;grid-template-columns:1fr;padding:30px 24px}.sbar{margin:0 auto;border-radius:0 0 24px 24px;flex-wrap:wrap}.fgrid{grid-template-columns:1fr}}
+@media(max-width:640px){.fcta h2{font-size:30px}.cform{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
