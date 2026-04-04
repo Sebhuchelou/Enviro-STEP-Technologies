@@ -481,7 +481,18 @@ tbody tr:hover{background:#f8fbf5;}
 .modal-spinner{padding:0 26px 0;margin-top:12px;font-size:12px;color:#555;}
 @media(max-width:1100px){.hero-pill,.hero-portal{font-size:16px;min-height:48px;padding:0 20px}.hero-inner{width:min(1440px,calc(100% - 40px));}}
 @media(max-width:900px){.hero-shell{min-height:580px}.hero-top,.hero-nav{justify-content:center}.hero-brand{width:100%;display:flex;justify-content:center}.hero-title-wrap{padding-top:90px}.hero-actions{justify-content:center}.page-header{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}.main{padding:16px}.hero-card-grid{gap:12px}.hero-access-card{width:100%;max-width:280px}.home-panel{width:min(1380px,calc(100% - 32px));}.home-footer-bar{padding:10px 16px;flex-direction:column;gap:6px}.navbar{padding-left:16px!important;padding-right:16px!important;}}
-
+.fctaw{margin-top:80px}
+.fcta{display:flex;justify-content:space-between;align-items:center;padding:50px;border-radius:40px;background:#1b5e99;color:#fff}
+.cform{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.ci,.cs{padding:12px;border-radius:20px;border:none}
+.sndbtn{padding:12px 30px;border-radius:25px;background:transparent;border:2px solid #fff;color:#fff}
+.sbar{margin-top:-40px;padding:20px 40px;background:#7ac143;border-radius:0 0 40px 40px;color:#fff;display:flex;justify-content:space-between;align-items:center}
+.sfoot{background:#e5e5e5;padding:50px 20px}
+.fgrid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:30px}
+.fcolt{background:#1b5e99;color:#fff;padding:10px;border-radius:10px;text-align:center;margin-bottom:10px}
+.fcol,.fcol a,.fmlinks a,.faqlink{color:#7ac143;text-decoration:none}
+.fbot{margin-top:30px;text-align:center;color:#1b5e99}
+.backtop{position:fixed;bottom:20px;right:20px;background:#7ac143;color:#fff;padding:10px 15px;border-radius:10px;text-decoration:none}
 </style>
 </head>
 <body>
@@ -1494,4 +1505,90 @@ function deleteUser(id){
 }
 </script>
 </body>
+
+  <!-- FOOTER -->
+<section class="fctaw">
+  <div class="fcta">
+    <div>
+      <h2>Vous souhaitez lancer votre projet ?</h2>
+      <p>Nos conseillers sont là pour répondre à vos questions et à vous orienter dans la conception de votre projet</p>
+    </div>
+
+    <form class="cform">
+      <input class="ci" type="text" placeholder="Nom"/>
+      <input class="ci" type="text" placeholder="Numéro de téléphone"/>
+      <div class="csw">
+        <select class="cs">
+          <option>Région</option>
+          <option>Capitale-Nationale</option>
+          <option>Chaudière-Appalaches</option>
+          <option>Montréal</option>
+        </select>
+      </div>
+      <div class="csend">
+        <button class="sndbtn" type="button">Envoyer</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="sbar">
+    <h3>Suivez-nous sur</h3>
+    <div class="sicons">
+      <a href="#" class="sicon">f</a>
+      <a href="#" class="sicon">in</a>
+      <a href="#" class="sicon">▶</a>
+    </div>
+  </div>
+</section>
+
+<footer class="sfoot">
+  <div class="fgrid">
+    <div class="fbrand">
+      <img src="https://enviro-step.ca/wp-content/uploads/2025/10/Refont-logo.png" alt="Enviro-STEP"/>
+    </div>
+
+    <div>
+      <div class="fcolt">NOUS JOINDRE</div>
+      <div class="fcol">
+        <p><a href="tel:+14186264040">+ 1 (418) 626-4040</a></p>
+        <p>Sans frais :</p>
+        <p><a href="tel:+18779257496">+ 1 877 925-7496</a></p>
+      </div>
+    </div>
+
+    <div>
+      <div class="fcolt">NOTRE HORAIRE</div>
+      <div class="fcol">
+        <p>Du lundi au jeudi : de 8h à 17h</p>
+        <p>Le vendredi : de 8h à 16h</p>
+        <p>Le samedi et dimanche : fermé</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="fcolt">MENU</div>
+      <div class="fmlinks">
+        <a href="#">Accueil</a>
+        <a href="#">Avis d'installation</a>
+        <a href="#">Support Technique</a>
+        <a href="#">Distributeurs</a>
+        <a href="#">Nous contacter</a>
+        <a href="#">Paiement en ligne</a>
+      </div>
+      <a href="#" class="faqlink">FAQ</a>
+    </div>
+  </div>
+
+  <div class="fbot">
+    <span>© 2026 Enviro-STEP Technologies Inc.</span>
+    <span>|</span>
+    <a href="#">Conditions générales</a>
+    <span>|</span>
+    <a href="#">Politique de cookies</a>
+    <span>|</span>
+    <a href="#">Politique de confidentialités</a>
+  </div>
+
+  <a href="#top" class="backtop">⌃</a>
+</footer>
 </html>
