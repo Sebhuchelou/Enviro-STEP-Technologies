@@ -2088,7 +2088,7 @@ function renderUsers(){
   const vc={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#7c3aed'};
   const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller'};
   const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller'};
-  const cards=allUsers.map(u=>{
+  const cards=allUsers.filter(u=>u.actif!==false).map(u=>{
     const init=((u.prenom||'?')[0]+((u.nom||'?')[0])).toUpperCase();
     const col=vc[u.role]||'#607d8b';
     return`<div class="user-card ${vb[u.role]||''}">
@@ -2101,7 +2101,10 @@ function renderUsers(){
           ${(u.mrcs&&u.mrcs.length)?'<div class="uc-co">MRC : '+esc(u.mrcs.join(', '))+'</div>':''}
         </div>
       </div>
-      <span class="uc-role" style="background:${col}18;color:${col};border:1px solid ${col}33">${rl[u.role]||u.role}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span class="uc-role" style="background:${col}18;color:${col};border:1px solid ${col}33">${rl[u.role]||u.role}</span>
+        <span style="padding:2px 9px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);letter-spacing:.4px;text-transform:uppercase;${u.actif===false?'background:#ffebee;color:#c62828;border:1px solid #fca5a5':'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7'}">${u.actif===false?'Inactif':'Actif'}</span>
+      </div>
       <div class="uc-actions">
         <button class="btn btn-secondary btn-sm" data-edit="${esc(u.id)}">✎ Modifier</button>
         ${u.id!==session.id?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':'<span style="font-size:.74rem;color:var(--slate)">(votre compte)</span>'}
@@ -2175,6 +2178,7 @@ function renderUserForm(){
           </select>
         </div>
         <div class="form-group full"><label>MRC(s)</label><input id="uf-mrcs" value="${u&&Array.isArray(u.mrcs)?esc(u.mrcs.join(', ')):''}" placeholder="Ex. Bellechasse, Montmagny, L'Islet"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Pour un conseiller, séparez les MRC par des virgules.</small></div>
+        ${userFormMode==='edit'?`<div class="form-group"><label>Statut du compte</label><select id="uf-actif"><option value="true"${u&&u.actif!==false?' selected':''}>Actif</option><option value="false"${u&&u.actif===false?' selected':''}>Inactif</option></select></div>`:''}
         ${userFormMode==='add'?`<div class="form-group full"><label>Mot de passe * (min. 6 caractères)</label><input type="password" id="uf-pass" placeholder="••••••••"/></div>`
         :`<div class="form-group full"><label>Nouveau mot de passe (laisser vide = inchangé)</label><input type="password" id="uf-pass" placeholder="••••••••"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Le changement de mot de passe se fait via la console Firebase Authentication</small></div>`}
       </div>
@@ -2213,7 +2217,9 @@ async function saveUserForm(){
       toast('Utilisateur créé avec succès');
     } else {
       // Update Firestore profile only
-      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,updatedAt:FB.serverTimestamp()});
+      const actifEl=document.getElementById('uf-actif');
+      const actif=actifEl?actifEl.value==='true':true;
+      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,actif,updatedAt:FB.serverTimestamp()});
       toast('Profil mis à jour');
     }
     userFormMode=null;userFormId=null;
@@ -2225,12 +2231,12 @@ function editUser(id){showUserForm('edit',id)}
 
 function deleteUser(id){
   const u=allUsers.find(x=>x.id===id);if(!u)return;
-  if(u.id===session.id){toast('Impossible de supprimer votre propre compte','err');return}
-  confirm2(`Supprimer ${u.prenom} ${u.nom} (${u.email}) ?\nNote: supprimez aussi le compte dans la console Firebase Authentication.`,async()=>{
+  if(u.id===session.id){toast('Impossible de désactiver votre propre compte','err');return}
+  confirm2(`Supprimer ${u.prenom} ${u.nom} (${u.email}) ?`,async()=>{
     setSyncing(true);
     try{
-      await FB.deleteDoc(FB.doc(FB.db,'users',id));
-      toast('Profil supprimé — pensez à supprimer le compte Firebase Auth','warn');
+      await FB.updateDoc(FB.doc(FB.db,'users',id),{actif:false,updatedAt:FB.serverTimestamp()});
+      toast('Utilisateur supprimé','warn');
     }catch(e){toast('Erreur: '+e.message,'err')}
     setSyncing(false);
   });
