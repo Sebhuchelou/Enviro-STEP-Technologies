@@ -2125,6 +2125,7 @@ function renderUsers(){
       <div class="uc-actions">
         <button class="btn btn-secondary btn-sm" data-edit="${esc(u.id)}">✎ Modifier</button>
         ${u.id!==session.id?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':'<span style="font-size:.74rem;color:var(--slate)">(votre compte)</span>'}
+        ${u.actif===false&&u.id!==session.id?'<button class="btn btn-danger btn-sm" data-permadel="'+esc(u.id)+'" style="background:var(--err);color:#fff;border-color:var(--err)">🗑 Supprimer de la BD</button>':''}
       </div>
     </div>`;
   }).join('');
@@ -2170,10 +2171,12 @@ function renderUsers(){
 
   // Delegate edit/delete on cards — global handler, no removeEventListener
   main.onclick = function(e){
-    const editBtn = e.target.closest('[data-edit]');
-    const delBtn  = e.target.closest('[data-del]');
-    if(editBtn) editUser(editBtn.dataset.edit);
-    if(delBtn)  deleteUser(delBtn.dataset.del);
+    const editBtn     = e.target.closest('[data-edit]');
+    const delBtn      = e.target.closest('[data-del]');
+    const permadelBtn = e.target.closest('[data-permadel]');
+    if(editBtn)     editUser(editBtn.dataset.edit);
+    if(delBtn)      deleteUser(delBtn.dataset.del);
+    if(permadelBtn) deleteUserPermanent(permadelBtn.dataset.permadel);
   };
 
   if(userFormMode)renderUserForm();
@@ -2253,7 +2256,17 @@ async function saveUserForm(){
   setSyncing(false);
 }
 
-function editUser(id){showUserForm('edit',id)}
+function deleteUserPermanent(id){
+  const u=allUsers.find(x=>x.id===id);if(!u)return;
+  confirm2(`Supprimer définitivement ${u.prenom} ${u.nom} (${u.email}) de Firestore ?\nCette action est irréversible.\nNote : supprimez aussi le compte dans la console Firebase Authentication.`,async()=>{
+    setSyncing(true);
+    try{
+      await FB.deleteDoc(FB.doc(FB.db,'users',id));
+      toast('Utilisateur supprimé définitivement de Firestore','warn');
+    }catch(e){toast('Erreur: '+e.message,'err')}
+    setSyncing(false);
+  });
+}
 
 function deleteUser(id){
   const u=allUsers.find(x=>x.id===id);if(!u)return;
