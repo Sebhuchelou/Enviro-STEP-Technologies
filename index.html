@@ -1140,11 +1140,14 @@ function renderTableau(){
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle ligne
         </button>`:''}
         <button class="btn btn-blue" onclick="exportCSV()">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>Exporter
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>CSV
+        </button>
+        <button class="btn btn-blue" onclick="exportXLSX()" style="background:#217346;border-color:#217346">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>XLSX
         </button>
         ${isAdmin?`
         <button class="btn btn-secondary" onclick="downloadTemplate()">
-          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
         </button>
         <button class="btn btn-secondary" onclick="openImport()">
           <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer Excel
@@ -1298,38 +1301,71 @@ function exportCSV(){
 // ════════════════════════════════════════════════════════
 // TEMPLATE + IMPORT
 // ════════════════════════════════════════════════════════
+function loadXLSX(cb){
+  if(typeof XLSX!=='undefined'){cb();return}
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload=cb;document.head.appendChild(s);
+}
+
 function downloadTemplate(){
-  const headers=[
-    '#PO Assembleur','#PO Norweco',"Nom de l'Assembleur",
-    'Date de réception chez l\'assembleur','Numéro de série HK',
-    'Produit Principal','Produit #2','Produit #3',
-    'Conseiller',"Nom de l'entrepreneur",'Installateur autorisé',
-    'Hydro-prime cumulés ($)','Hydro-prime utilisés ($)','Hydro-prime restants ($)',
-    'Date de livraison en provenance de l\'assembleur',
-    'Entrepreneur direct ou distributeur ?','Nom du distributeur',
-    'Date de livraison en provenance du distributeur',
-    "Adresse du site d'installation",'Ville de livraison',
-    "Notes de l'assembleur (si requis)",'Notes du distributeur (si requis)',
-    'Assembleur/Distributeur',"Identification du site d'installation",
-    'Statut','Dernière modification','Dernier utilisateur'
-  ];
-  const example=['ASM-2026-001','NOR-0001','Assemblages HK Inc.',
-    '2026-01-15','HK-2026-0001',
-    'Hydro-Kinetic HK-100','','',
-    'Jean Tremblay','Constructions Lapointe inc.','Installations Verts',
-    '1500','250','1250',
-    '2026-02-01',
-    'Entrepreneur direct','',
-    '',
-    '123 Rue Principale','Québec',
-    '','','Assemblages HK Inc.','STE-CLAIRE-2026-001',
-    'Fabriqué','2026-02-01','admin@enviro-step.ca'
-  ];
-  const csv='\uFEFF'+headers.join(';')+'\n'+example.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download='HK-Tracker_Gabarit_Import.csv';a.click();
-  toast('Gabarit téléchargé — ouvrez-le dans Excel');
+  loadXLSX(()=>{
+    const headers=[
+      '#PO Assembleur','#PO Norweco',"Nom de l'Assembleur",
+      "Date de réception chez l'assembleur",'Numéro de série HK',
+      'Produit Principal','Produit #2','Produit #3',
+      'Conseiller',"Nom de l'entrepreneur",'Installateur autorisé',
+      'Hydro-prime cumulés ($)','Hydro-prime utilisés ($)','Hydro-prime restants ($)',
+      "Date de livraison en provenance de l'assembleur",
+      'Entrepreneur direct ou distributeur ?','Nom du distributeur',
+      'Date de livraison en provenance du distributeur',
+      "Adresse du site d'installation",'Ville de livraison',
+      "Notes de l'assembleur (si requis)",'Notes du distributeur (si requis)',
+      'Assembleur/Distributeur',"Identification du site d'installation",
+      'Statut','Dernière modification','Dernier utilisateur'
+    ];
+    const example=['ASM-2026-001','NOR-0001','Assemblages HK Inc.',
+      '2026-01-15','HK-2026-0001','Hydro-Kinetic HK-100','','',
+      'Jean Tremblay','Constructions Lapointe inc.','Installations Verts',
+      1500,250,1250,'2026-02-01','Entrepreneur direct','','',
+      '123 Rue Principale','Québec','','','Assemblages HK Inc.',
+      'STE-CLAIRE-2026-001','Fabriqué','2026-02-01','admin@enviro-step.ca'
+    ];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+    // Column widths
+    ws['!cols']=headers.map((_,i)=>({wch:i<2?16:i===4?20:24}));
+    // Header style (row 1)
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center',wrapText:true}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Gabarit Import');
+    XLSX.writeFile(wb,'HK-Tracker_Gabarit_Import.xlsx');
+    toast('Gabarit XLSX téléchargé ✓');
+  });
+}
+
+function exportXLSX(){
+  loadXLSX(()=>{
+    const cols=getCols(), rows=getRows();
+    const headers=cols.map(c=>c.l);
+    const data=rows.map(r=>cols.map(c=>r[c.k]??''));
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=cols.map(()=>({wch:22}));
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center',wrapText:true}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'HK Tracker');
+    XLSX.writeFile(wb,'HK-Tracker_Export_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
 }
 
 function openImport(){
@@ -1549,6 +1585,182 @@ function exportAvisCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='avis-installation.csv';a.click();
 }
 
+function exportAvisXLSX(){
+  loadXLSX(()=>{
+    const rows=getAvisRows();
+    const headers=AI_COLS.map(c=>c.l);
+    const data=rows.map(r=>AI_COLS.map(c=>r[c.k]??''));
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=AI_COLS.map(()=>({wch:26}));
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'065AA3'}},alignment:{horizontal:'center',wrapText:true}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Avis installation');
+    XLSX.writeFile(wb,'AvisInstallation_Export_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
+}
+
+function downloadAvisGabarit(){
+  loadXLSX(()=>{
+    const headers=AI_COLS.map(c=>c.l);
+    const example=[
+      '2026-06-15','123 Rue Principale','Québec','QC','G1V 1A1','LOT-2026-001',
+      'Capitale-Nationale','Jean Tremblay','Marie','Côté','418-555-0100','418-555-0101',
+      'marie.cote@email.com','Installations Verts inc.','install@vertsinc.ca','418-555-0200',
+      'Hydro-Kinetic HK-100','','','Enviro-STEP','Génie Plus inc.',
+      'François','Bergeron','f.bergeron@enviro-step.ca','Aucune note'
+    ];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+    ws['!cols']=AI_COLS.map(()=>({wch:28}));
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'065AA3'}},alignment:{horizontal:'center',wrapText:true}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Gabarit');
+    XLSX.writeFile(wb,'AvisInstallation_Gabarit_Import.xlsx');
+    toast('Gabarit XLSX téléchargé ✓');
+  });
+}
+
+// ── AVIS INSTAL IMPORT ────────────────────────────────
+let aiImportParsed=[];
+
+const AI_IMPORT_MAP={};
+AI_COLS.forEach(c=>{ AI_IMPORT_MAP[c.l.toLowerCase().trim()]=c.k; });
+// Extra aliases
+AI_IMPORT_MAP["date d'installation prévue"]='date_installation';
+AI_IMPORT_MAP['date installation']='date_installation';
+AI_IMPORT_MAP['numéro civique, rue (site)']='no_civique_rue';
+AI_IMPORT_MAP['no civique rue']='no_civique_rue';
+AI_IMPORT_MAP['ville (site)']='ville_site';
+AI_IMPORT_MAP['province (site)']='province_site';
+AI_IMPORT_MAP['code postal (site)']='code_postal_site';
+AI_IMPORT_MAP['numéro de lot (site)']='no_lot';
+AI_IMPORT_MAP['région administrative']='region_admin';
+AI_IMPORT_MAP['conseiller régional']='conseiller_regional';
+AI_IMPORT_MAP['prénom client']='prenom_client';
+AI_IMPORT_MAP['nom client']='nom_client';
+AI_IMPORT_MAP['téléphone client']='tel_client';
+AI_IMPORT_MAP['autre téléphone client']='autre_tel_client';
+AI_IMPORT_MAP['courriel client']='courriel_client';
+AI_IMPORT_MAP['entreprise installateur']='nom_entreprise_install';
+AI_IMPORT_MAP['courriel installateur']='courriel_installateur';
+AI_IMPORT_MAP['téléphone installateur']='tel_installateur';
+AI_IMPORT_MAP['produit principal']='produit_principal';
+AI_IMPORT_MAP['produit #2']='produit2';
+AI_IMPORT_MAP['produit #3']='produit3';
+AI_IMPORT_MAP['distributeur hydro-kinetic']='distributeur_hk';
+AI_IMPORT_MAP['firme technologue/ingénieur']='firme_technologue';
+AI_IMPORT_MAP['prénom (complété par)']='prenom_completeur';
+AI_IMPORT_MAP['nom (complété par)']='nom_completeur';
+AI_IMPORT_MAP['courriel (complété par)']='courriel_completeur';
+AI_IMPORT_MAP['note au distributeur']='note_distributeur';
+
+function openAvisImport(){
+  aiImportParsed=[];
+  document.getElementById('avis-import-preview-area').style.display='none';
+  document.getElementById('avis-import-confirm-btn').style.display='none';
+  document.getElementById('avis-import-stats').innerHTML='';
+  document.getElementById('avis-import-log').style.display='none';
+  document.getElementById('avis-import-log').textContent='';
+  document.getElementById('avis-import-preview-table').innerHTML='';
+  document.getElementById('avis-file-input').value='';
+  document.getElementById('avis-import-overlay').classList.add('open');
+}
+function closeAvisImport(){document.getElementById('avis-import-overlay').classList.remove('open')}
+function closeAvisImportOutside(e){if(e.target===document.getElementById('avis-import-overlay'))closeAvisImport()}
+function handleAvisDrop(e){e.preventDefault();document.getElementById('avis-drop-zone').classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)processAvisImportFile(f)}
+function handleAvisFileSelect(input){if(input.files[0])processAvisImportFile(input.files[0])}
+
+function processAvisImportFile(file){
+  const n=file.name.toLowerCase();
+  if(!n.endsWith('.csv')&&!n.endsWith('.xlsx')){toast('Format non supporté — .xlsx ou .csv uniquement','err');return}
+  const r=new FileReader();
+  if(n.endsWith('.csv')){r.onload=e=>parseAvisCSVImport(e.target.result);r.readAsText(file,'UTF-8')}
+  else{r.onload=e=>parseAvisXLSXImport(e.target.result);r.readAsArrayBuffer(file)}
+}
+
+function parseAvisCSVImport(text){
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){toast('Fichier vide','err');return}
+  const delim=lines[0].includes(';')?';':',';
+  function parseLine(line){
+    const fields=[];let inQ=false,cur='';
+    for(let i=0;i<line.length;i++){
+      const c=line[i];if(c==='"'){inQ=!inQ}
+      else if(c===delim&&!inQ){fields.push(cur.trim());cur=''}else cur+=c;
+    }
+    fields.push(cur.trim());
+    return fields.map(f=>f.replace(/^"|"$/g,'').replace(/""/g,'"').trim());
+  }
+  buildAvisImportPreview(parseLine(lines[0]),lines.slice(1).map(l=>parseLine(l)));
+}
+
+function parseAvisXLSXImport(buffer){
+  loadXLSX(()=>{
+    const wb=XLSX.read(buffer,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(data.length<2){toast('Fichier vide','err');return}
+    buildAvisImportPreview(data[0].map(String),data.slice(1).map(r=>r.map(String)));
+  });
+}
+
+function buildAvisImportPreview(headers,rows){
+  const logs=[];
+  aiImportParsed=[];
+  const colMap=headers.map(h=>AI_IMPORT_MAP[h.toLowerCase().trim()]||null);
+  rows.forEach((row,i)=>{
+    if(row.every(c=>!String(c).trim()))return;
+    const record={};
+    colMap.forEach((key,ci)=>{if(key)record[key]=String(row[ci]||'').trim()});
+    const hasData=Object.values(record).some(v=>v);
+    if(!hasData){logs.push(`⚠ Ligne ${i+2} : vide — ignorée`);return}
+    aiImportParsed.push(record);
+  });
+  document.getElementById('avis-import-stats').innerHTML=
+    `<span class="import-stat stat-ok">✓ ${aiImportParsed.length} avis à importer</span>`;
+  if(logs.length){const l=document.getElementById('avis-import-log');l.style.display='block';l.innerHTML=logs.join('<br/>')}
+  const previewCols=['date_installation','prenom_client','nom_client','ville_site','conseiller_regional','produit_principal'];
+  const previewLabels=['Date','Prénom','Nom','Ville','Conseiller','Produit'];
+  document.getElementById('avis-import-preview-table').innerHTML=`<table>
+    <thead><tr>${previewLabels.map(l=>`<th>${l}</th>`).join('')}</tr></thead>
+    <tbody>${aiImportParsed.slice(0,8).map(r=>`<tr>${previewCols.map(k=>`<td>${esc(r[k]||'—')}</td>`).join('')}</tr>`).join('')}
+    ${aiImportParsed.length>8?`<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:8px">… et ${aiImportParsed.length-8} autre${aiImportParsed.length-8!==1?'s':''}</td></tr>`:''}
+    </tbody></table>`;
+  document.getElementById('avis-import-preview-area').style.display='block';
+  if(aiImportParsed.length>0){
+    const btn=document.getElementById('avis-import-confirm-btn');
+    btn.style.display='inline-flex';
+    btn.innerHTML=`<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg> Importer ${aiImportParsed.length} avis`;
+  }
+}
+
+async function confirmAvisImport(){
+  if(!aiImportParsed.length)return;
+  const btn=document.getElementById('avis-import-confirm-btn');
+  btn.disabled=true;btn.textContent='Import en cours…';
+  setSyncing(true);
+  let added=0,errors=0;
+  for(const r of aiImportParsed){
+    try{
+      await FB.addDoc(FB.collection(FB.db,'AvisInstal'),{...r,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
+      added++;
+    }catch(e){errors++;console.error(e)}
+  }
+  closeAvisImport();setSyncing(false);btn.disabled=false;
+  toast(`Import terminé — ${added} avis ajouté${added!==1?'s':''}${errors?', '+errors+' erreur(s)':''}`);
+}
+
 function renderAvisInstal(){
   const rows=getAvisRows();
   const thHtml=AI_COLS.map(c=>{
@@ -1566,7 +1778,16 @@ function renderAvisInstal(){
       </div>
       <div class="page-actions">
         <button class="btn btn-blue" onclick="exportAvisCSV()">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>Exporter CSV
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>CSV
+        </button>
+        <button class="btn btn-blue" onclick="exportAvisXLSX()" style="background:#217346;border-color:#217346">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>XLSX
+        </button>
+        <button class="btn btn-secondary" onclick="downloadAvisGabarit()">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
+        </button>
+        <button class="btn btn-secondary" onclick="openAvisImport()">
+          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer XLSX
         </button>
       </div>
     </div>
@@ -1714,6 +1935,33 @@ function deleteUser(id){
   });
 }
 </script>
+
+<!-- AVIS INSTAL IMPORT MODAL -->
+<div class="overlay" id="avis-import-overlay" onclick="closeAvisImportOutside(event)">
+  <div class="import-modal">
+    <button class="modal-close" onclick="closeAvisImport()">✕</button>
+    <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:#222;margin-bottom:4px">Importer des Avis d'installation</div>
+    <div style="font-size:12px;color:#999;margin-bottom:16px;padding-bottom:14px;border-bottom:3px solid var(--blue)">Fichier .xlsx ou .csv — colonnes selon le gabarit</div>
+    <div class="drop-zone" id="avis-drop-zone"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleAvisDrop(event)"
+         onclick="document.getElementById('avis-file-input').click()">
+      <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+      <p>Glissez votre fichier ici ou <strong>cliquez pour parcourir</strong><br/>.xlsx ou .csv</p>
+    </div>
+    <input type="file" id="avis-file-input" accept=".xlsx,.csv" style="display:none" onchange="handleAvisFileSelect(this)"/>
+    <div class="import-stats" id="avis-import-stats"></div>
+    <div class="import-log" id="avis-import-log" style="display:none"></div>
+    <div id="avis-import-preview-area" style="display:none">
+      <div class="import-preview" id="avis-import-preview-table"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeAvisImport()">Annuler</button>
+        <button class="btn btn-primary" id="avis-import-confirm-btn" style="display:none" onclick="confirmAvisImport()"></button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- FOOTER -->
 <section class="fctaw">
