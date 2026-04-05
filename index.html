@@ -1810,25 +1810,27 @@ function renderAvisInstal(){
 // GESTION UTILISATEURS — XLSX EXPORT / IMPORT
 // ════════════════════════════════════════════════════════
 const USER_COLS=[
-  {k:'prenom',    l:'Prénom'},
-  {k:'nom',       l:'Nom'},
-  {k:'compagnie', l:'Compagnie'},
-  {k:'ville',     l:'Ville'},
-  {k:'email',     l:'Courriel'},
-  {k:'role',      l:'Rôle'},
-  {k:'mrcs',      l:'MRC(s)'},
+  {k:'prenom',       l:'Prénom'},
+  {k:'nom',          l:'Nom'},
+  {k:'compagnie',    l:'Compagnie'},
+  {k:'ville',        l:'Ville'},
+  {k:'email',        l:'Courriel'},
+  {k:'role',         l:'Rôle'},
+  {k:'mrcs',         l:'MRC(s)'},
+  {k:'mot_de_passe', l:'Mot de passe (nouveau seulement)', exportSkip:true},
 ];
 
 function exportUsersXLSX(){
   loadXLSX(()=>{
-    const headers=USER_COLS.map(c=>c.l);
-    const data=allUsers.map(u=>USER_COLS.map(c=>{
+    const exportCols=USER_COLS.filter(c=>!c.exportSkip);
+    const headers=exportCols.map(c=>c.l);
+    const data=allUsers.map(u=>exportCols.map(c=>{
       const v=u[c.k];
       return Array.isArray(v)?v.join(', '):(v??'');
     }));
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-    ws['!cols']=[{wch:16},{wch:18},{wch:26},{wch:18},{wch:30},{wch:16},{wch:40}];
+    ws['!cols']=exportCols.map(()=>({wch:22}));
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){
       const addr=XLSX.utils.encode_cell({r:0,c:C});
@@ -1846,13 +1848,13 @@ function downloadUsersGabarit(){
     const headers=USER_COLS.map(c=>c.l);
     const roles='assembleur | distributeur | conseiller | administrateur';
     const example=[
-      ['Marie','Tremblay','Assemblages HK inc.','Québec','marie.tremblay@hk.ca','assembleur',''],
-      ['Jean','Lapointe','Distribution Nord inc.','Chicoutimi','jean.lapointe@nord.ca','distributeur',''],
-      ['Sophie','Girard','Conseil régional','Lévis','sophie.girard@conseil.ca','conseiller','Bellechasse, Montmagny, L\'Islet'],
+      ['Marie','Tremblay','Assemblages HK inc.','Québec','marie.tremblay@hk.ca','assembleur','','MotDePasse123'],
+      ['Jean','Lapointe','Distribution Nord inc.','Chicoutimi','jean.lapointe@nord.ca','distributeur','','MotDePasse456'],
+      ['Sophie','Girard','Conseil régional','Lévis','sophie.girard@conseil.ca','conseiller',"Bellechasse, Montmagny, L'Islet",'MotDePasse789'],
     ];
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
-    ws['!cols']=[{wch:16},{wch:18},{wch:26},{wch:18},{wch:30},{wch:16},{wch:40}];
+    ws['!cols']=[{wch:14},{wch:16},{wch:26},{wch:16},{wch:30},{wch:16},{wch:40},{wch:28}];
     // Header style
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){
@@ -1864,19 +1866,20 @@ function downloadUsersGabarit(){
     const wsNote=XLSX.utils.aoa_to_sheet([
       ['INSTRUCTIONS'],
       [''],
-      ['Champ','Valeurs acceptées / format'],
-      ['Prénom','Texte libre'],
-      ['Nom','Texte libre'],
-      ['Compagnie','Nom exact de l\'entreprise'],
-      ['Ville','Texte libre'],
-      ['Courriel','Adresse courriel valide (obligatoire)'],
-      ['Rôle',roles],
-      ['MRC(s)','Séparez plusieurs MRC par des virgules — requis pour le rôle conseiller'],
+      ['Champ','Valeurs acceptées / format','Obligatoire ?'],
+      ['Prénom','Texte libre','Oui'],
+      ['Nom','Texte libre','Oui'],
+      ['Compagnie','Nom exact de l\'entreprise','Oui'],
+      ['Ville','Texte libre','Non'],
+      ['Courriel','Adresse courriel valide','Oui'],
+      ['Rôle',roles,'Oui'],
+      ['MRC(s)','Séparez plusieurs MRC par des virgules — requis pour le rôle conseiller','Non'],
+      ['Mot de passe (nouveau seulement)','Min. 6 caractères — requis pour créer le compte Firebase Auth','Oui (nouveaux)'],
       [''],
-      ['⚠ Note','Un compte Firebase Auth DOIT être créé manuellement pour chaque utilisateur importé.'],
-      ['','L\'import crée uniquement le profil Firestore (sans connexion possible).'],
+      ['⚠ Mise à jour','Si le courriel existe déjà, seul le profil Firestore est mis à jour (sans toucher au mot de passe).',''],
+      ['ℹ Sécurité','Supprimez la colonne mot de passe du fichier après utilisation.',''],
     ]);
-    wsNote['!cols']=[{wch:18},{wch:70}];
+    wsNote['!cols']=[{wch:30},{wch:70},{wch:16}];
     XLSX.utils.book_append_sheet(wb,ws,'Gabarit');
     XLSX.utils.book_append_sheet(wb,wsNote,'Instructions');
     XLSX.writeFile(wb,'HK-Utilisateurs_Gabarit_Import.xlsx');
@@ -1895,6 +1898,8 @@ const USERS_IMPORT_MAP={
   'courriel':'email','email':'email','courriel électronique':'email',
   'rôle':'role','role':'role',
   'mrc(s)':'mrcs','mrcs':'mrcs','mrc':'mrcs',
+  'mot de passe (nouveau seulement)':'mot_de_passe',
+  'mot de passe':'mot_de_passe','password':'mot_de_passe','mdp':'mot_de_passe',
 };
 
 function openUsersImport(){
@@ -1965,7 +1970,7 @@ function buildUsersImportPreview(headers,rows){
     // Validate role
     if(rec.role&&!VALID_ROLES.includes(rec.role.toLowerCase())){
       logs.push(`⚠ Ligne ${i+2} : rôle "${rec.role}" invalide (${VALID_ROLES.join('/')})`);
-      rec.role='assembleur'; // default
+      rec.role='assembleur';
     }
     if(rec.role)rec.role=rec.role.toLowerCase();
     // MRCs → array
@@ -1973,8 +1978,16 @@ function buildUsersImportPreview(headers,rows){
     else rec.mrcs=[];
     // Duplicate check
     const dup=allUsers.find(u=>u.email===rec.email);
-    if(dup){logs.push(`ℹ Ligne ${i+2} : "${rec.email}" existe déjà — sera mis à jour (profil Firestore uniquement)`);rec._isUpdate=true;rec._dbId=dup.id;}
-    else rec._isUpdate=false;
+    if(dup){
+      logs.push(`ℹ Ligne ${i+2} : "${rec.email}" existe déjà — profil Firestore mis à jour`);
+      rec._isUpdate=true;rec._dbId=dup.id;
+    } else {
+      // Password required for new users
+      if(!rec.mot_de_passe||rec.mot_de_passe.length<6){
+        logs.push(`⚠ Ligne ${i+2} : "${rec.email}" — mot de passe manquant ou < 6 caractères — ignorée`);return;
+      }
+      rec._isUpdate=false;
+    }
     usersImportParsed.push(rec);
   });
 
@@ -1990,10 +2003,11 @@ function buildUsersImportPreview(headers,rows){
     l.style.display='block';l.innerHTML=logs.join('<br/>');
   }
   document.getElementById('users-import-preview-table').innerHTML=`<table>
-    <thead><tr><th>Prénom</th><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Compagnie</th><th>Action</th></tr></thead>
+    <thead><tr><th>Prénom</th><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Compagnie</th><th>Mot de passe</th><th>Action</th></tr></thead>
     <tbody>${usersImportParsed.slice(0,8).map(r=>`<tr>
       <td>${esc(r.prenom||'—')}</td><td>${esc(r.nom||'—')}</td><td>${esc(r.email)}</td>
       <td>${esc(r.role||'—')}</td><td>${esc(r.compagnie||'—')}</td>
+      <td>${r._isUpdate?'<span style="color:var(--slate);font-size:.74rem">—</span>':(r.mot_de_passe?'••••••':'<span style="color:var(--err)">⚠ manquant</span>')}</td>
       <td><span class="badge ${r._isUpdate?'badge-warn':'badge-ok'}">${r._isUpdate?'Màj profil':'Nouveau'}</span></td>
     </tr>`).join('')}
     ${usersImportParsed.length>8?`<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:8px">… et ${usersImportParsed.length-8} autre${usersImportParsed.length-8!==1?'s':''}</td></tr>`:''}
@@ -2012,22 +2026,38 @@ async function confirmUsersImport(){
   btn.disabled=true;btn.textContent='Import en cours…';
   setSyncing(true);
   let added=0,updated=0,errors=0;
+  const FB_API_KEY='AIzaSyDPq8u5bO_8yACQromO5Vzgy5g_E6xrads';
   for(const r of usersImportParsed){
+    const pass=r.mot_de_passe||'';
     const rec={...r};
-    delete rec._isUpdate;delete rec._dbId;
+    delete rec._isUpdate;delete rec._dbId;delete rec.mot_de_passe;
     rec.updatedAt=FB.serverTimestamp();
     try{
       if(r._isUpdate&&r._dbId){
         await FB.updateDoc(FB.doc(FB.db,'users',r._dbId),rec);updated++;
       } else {
+        // 1. Create Firebase Auth account
+        const resp=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FB_API_KEY}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({email:r.email,password:pass,returnSecureToken:false})
+        });
+        const data=await resp.json();
+        if(data.error){
+          errors++;
+          console.error(`Firebase Auth erreur pour ${r.email}:`,data.error.message);
+          toast(`⚠ ${r.email} : ${data.error.message}`,'err');
+          continue;
+        }
+        // 2. Save Firestore profile with Auth UID as doc ID
         rec.createdAt=FB.serverTimestamp();
-        // Use email as doc ID hint — Firestore auto-id fallback
-        await FB.addDoc(FB.collection(FB.db,'users'),rec);added++;
+        rec.email=r.email;
+        await FB.setDoc(FB.doc(FB.db,'users',data.localId),rec,{merge:true});
+        added++;
       }
     }catch(e){errors++;console.error(e)}
   }
   closeUsersImport();setSyncing(false);btn.disabled=false;
-  toast(`Import terminé — ${added} ajouté${added!==1?'s':''}, ${updated} màj${errors?', '+errors+' erreur(s)':''}${newC?'. ⚠ Créez les comptes Firebase Auth manuellement.':''}`);
+  toast(`Import terminé — ${added} compte${added!==1?'s':''} créé${added!==1?'s':''}, ${updated} mis à jour${errors?', '+errors+' erreur(s)':''}`);
 }
 
 // ════════════════════════════════════════════════════════
@@ -2176,7 +2206,7 @@ function deleteUser(id){
     <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:#222;margin-bottom:4px">Importer des utilisateurs</div>
     <div style="font-size:12px;color:#999;margin-bottom:16px;padding-bottom:14px;border-bottom:3px solid var(--charcoal)">Fichier .xlsx ou .csv — colonnes selon le gabarit</div>
     <div style="background:#fffbe6;border:1px solid #f59e0b;border-left:3px solid #d97706;border-radius:3px;padding:9px 12px;font-size:12px;color:#78350f;margin-bottom:14px">
-      ⚠ L'import crée uniquement le <strong>profil Firestore</strong>. Chaque nouvel utilisateur doit avoir un compte créé manuellement dans <strong>Firebase Authentication</strong> pour pouvoir se connecter.
+      ⚠ Pour les <strong>nouveaux utilisateurs</strong>, le mot de passe du gabarit sera utilisé pour créer le compte Firebase Auth automatiquement. Pour les <strong>mises à jour</strong> (courriel existant), seul le profil Firestore est modifié — le mot de passe est ignoré.
     </div>
     <div class="drop-zone" id="users-drop-zone"
          ondragover="event.preventDefault();this.classList.add('dragover')"
