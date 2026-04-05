@@ -1807,6 +1807,230 @@ function renderAvisInstal(){
 }
 
 // ════════════════════════════════════════════════════════
+// GESTION UTILISATEURS — XLSX EXPORT / IMPORT
+// ════════════════════════════════════════════════════════
+const USER_COLS=[
+  {k:'prenom',    l:'Prénom'},
+  {k:'nom',       l:'Nom'},
+  {k:'compagnie', l:'Compagnie'},
+  {k:'ville',     l:'Ville'},
+  {k:'email',     l:'Courriel'},
+  {k:'role',      l:'Rôle'},
+  {k:'mrcs',      l:'MRC(s)'},
+];
+
+function exportUsersXLSX(){
+  loadXLSX(()=>{
+    const headers=USER_COLS.map(c=>c.l);
+    const data=allUsers.map(u=>USER_COLS.map(c=>{
+      const v=u[c.k];
+      return Array.isArray(v)?v.join(', '):(v??'');
+    }));
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=[{wch:16},{wch:18},{wch:26},{wch:18},{wch:30},{wch:16},{wch:40}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center'}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Utilisateurs');
+    XLSX.writeFile(wb,'HK-Utilisateurs_Export_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
+}
+
+function downloadUsersGabarit(){
+  loadXLSX(()=>{
+    const headers=USER_COLS.map(c=>c.l);
+    const roles='assembleur | distributeur | conseiller | administrateur';
+    const example=[
+      ['Marie','Tremblay','Assemblages HK inc.','Québec','marie.tremblay@hk.ca','assembleur',''],
+      ['Jean','Lapointe','Distribution Nord inc.','Chicoutimi','jean.lapointe@nord.ca','distributeur',''],
+      ['Sophie','Girard','Conseil régional','Lévis','sophie.girard@conseil.ca','conseiller','Bellechasse, Montmagny, L\'Islet'],
+    ];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
+    ws['!cols']=[{wch:16},{wch:18},{wch:26},{wch:18},{wch:30},{wch:16},{wch:40}];
+    // Header style
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center'}};
+    }
+    // Add note sheet
+    const wsNote=XLSX.utils.aoa_to_sheet([
+      ['INSTRUCTIONS'],
+      [''],
+      ['Champ','Valeurs acceptées / format'],
+      ['Prénom','Texte libre'],
+      ['Nom','Texte libre'],
+      ['Compagnie','Nom exact de l\'entreprise'],
+      ['Ville','Texte libre'],
+      ['Courriel','Adresse courriel valide (obligatoire)'],
+      ['Rôle',roles],
+      ['MRC(s)','Séparez plusieurs MRC par des virgules — requis pour le rôle conseiller'],
+      [''],
+      ['⚠ Note','Un compte Firebase Auth DOIT être créé manuellement pour chaque utilisateur importé.'],
+      ['','L\'import crée uniquement le profil Firestore (sans connexion possible).'],
+    ]);
+    wsNote['!cols']=[{wch:18},{wch:70}];
+    XLSX.utils.book_append_sheet(wb,ws,'Gabarit');
+    XLSX.utils.book_append_sheet(wb,wsNote,'Instructions');
+    XLSX.writeFile(wb,'HK-Utilisateurs_Gabarit_Import.xlsx');
+    toast('Gabarit XLSX téléchargé ✓');
+  });
+}
+
+// ── USERS IMPORT ──────────────────────────────────────
+let usersImportParsed=[];
+
+const USERS_IMPORT_MAP={
+  'prénom':'prenom','prenom':'prenom',
+  'nom':'nom',
+  'compagnie':'compagnie','entreprise':'compagnie','company':'compagnie',
+  'ville':'ville','city':'ville',
+  'courriel':'email','email':'email','courriel électronique':'email',
+  'rôle':'role','role':'role',
+  'mrc(s)':'mrcs','mrcs':'mrcs','mrc':'mrcs',
+};
+
+function openUsersImport(){
+  usersImportParsed=[];
+  ['users-import-preview-area','users-import-stats','users-import-log','users-import-preview-table'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.style.display='none';el.innerHTML='';}
+  });
+  document.getElementById('users-import-confirm-btn').style.display='none';
+  document.getElementById('users-file-input').value='';
+  document.getElementById('users-import-overlay').classList.add('open');
+}
+function closeUsersImport(){document.getElementById('users-import-overlay').classList.remove('open')}
+function closeUsersImportOutside(e){if(e.target===document.getElementById('users-import-overlay'))closeUsersImport()}
+function handleUsersDrop(e){e.preventDefault();document.getElementById('users-drop-zone').classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)processUsersImportFile(f)}
+function handleUsersFileSelect(input){if(input.files[0])processUsersImportFile(input.files[0])}
+
+function processUsersImportFile(file){
+  const n=file.name.toLowerCase();
+  if(!n.endsWith('.csv')&&!n.endsWith('.xlsx')){toast('Format non supporté — .xlsx ou .csv uniquement','err');return}
+  const r=new FileReader();
+  if(n.endsWith('.csv')){r.onload=e=>parseUsersCSVImport(e.target.result);r.readAsText(file,'UTF-8')}
+  else{r.onload=e=>parseUsersXLSXImport(e.target.result);r.readAsArrayBuffer(file)}
+}
+
+function parseUsersCSVImport(text){
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){toast('Fichier vide','err');return}
+  const delim=lines[0].includes(';')?';':',';
+  function parseLine(line){
+    const fields=[];let inQ=false,cur='';
+    for(let i=0;i<line.length;i++){
+      const c=line[i];if(c==='"'){inQ=!inQ}
+      else if(c===delim&&!inQ){fields.push(cur.trim());cur=''}else cur+=c;
+    }
+    fields.push(cur.trim());
+    return fields.map(f=>f.replace(/^"|"$/g,'').replace(/""/g,'"').trim());
+  }
+  buildUsersImportPreview(parseLine(lines[0]),lines.slice(1).map(l=>parseLine(l)));
+}
+
+function parseUsersXLSXImport(buffer){
+  loadXLSX(()=>{
+    const wb=XLSX.read(buffer,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(data.length<2){toast('Fichier vide','err');return}
+    buildUsersImportPreview(data[0].map(String),data.slice(1).map(r=>r.map(String)));
+  });
+}
+
+const VALID_ROLES=['assembleur','distributeur','conseiller','administrateur'];
+
+function buildUsersImportPreview(headers,rows){
+  const logs=[];
+  usersImportParsed=[];
+  const colMap=headers.map(h=>USERS_IMPORT_MAP[h.toLowerCase().trim()]||null);
+  const emailIdx=colMap.indexOf('email');
+
+  rows.forEach((row,i)=>{
+    if(row.every(c=>!String(c).trim()))return;
+    const rec={actif:true};
+    colMap.forEach((key,ci)=>{if(key)rec[key]=String(row[ci]||'').trim()});
+
+    // Validate email
+    if(!rec.email){logs.push(`⚠ Ligne ${i+2} : courriel manquant — ignorée`);return}
+    // Validate role
+    if(rec.role&&!VALID_ROLES.includes(rec.role.toLowerCase())){
+      logs.push(`⚠ Ligne ${i+2} : rôle "${rec.role}" invalide (${VALID_ROLES.join('/')})`);
+      rec.role='assembleur'; // default
+    }
+    if(rec.role)rec.role=rec.role.toLowerCase();
+    // MRCs → array
+    if(rec.mrcs)rec.mrcs=rec.mrcs.split(',').map(x=>x.trim()).filter(Boolean);
+    else rec.mrcs=[];
+    // Duplicate check
+    const dup=allUsers.find(u=>u.email===rec.email);
+    if(dup){logs.push(`ℹ Ligne ${i+2} : "${rec.email}" existe déjà — sera mis à jour (profil Firestore uniquement)`);rec._isUpdate=true;rec._dbId=dup.id;}
+    else rec._isUpdate=false;
+    usersImportParsed.push(rec);
+  });
+
+  const newC=usersImportParsed.filter(r=>!r._isUpdate).length;
+  const updC=usersImportParsed.filter(r=>r._isUpdate).length;
+  const statsEl=document.getElementById('users-import-stats');
+  statsEl.style.display='flex';
+  statsEl.innerHTML=
+    `<span class="import-stat stat-ok">✓ ${newC} nouveau${newC!==1?'x':''}</span>`+
+    (updC?`<span class="import-stat stat-upd">🔄 ${updC} mise${updC!==1?'s':''} à jour</span>`:'');
+  if(logs.length){
+    const l=document.getElementById('users-import-log');
+    l.style.display='block';l.innerHTML=logs.join('<br/>');
+  }
+  document.getElementById('users-import-preview-table').innerHTML=`<table>
+    <thead><tr><th>Prénom</th><th>Nom</th><th>Courriel</th><th>Rôle</th><th>Compagnie</th><th>Action</th></tr></thead>
+    <tbody>${usersImportParsed.slice(0,8).map(r=>`<tr>
+      <td>${esc(r.prenom||'—')}</td><td>${esc(r.nom||'—')}</td><td>${esc(r.email)}</td>
+      <td>${esc(r.role||'—')}</td><td>${esc(r.compagnie||'—')}</td>
+      <td><span class="badge ${r._isUpdate?'badge-warn':'badge-ok'}">${r._isUpdate?'Màj profil':'Nouveau'}</span></td>
+    </tr>`).join('')}
+    ${usersImportParsed.length>8?`<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:8px">… et ${usersImportParsed.length-8} autre${usersImportParsed.length-8!==1?'s':''}</td></tr>`:''}
+    </tbody></table>`;
+  document.getElementById('users-import-preview-area').style.display='block';
+  if(usersImportParsed.length>0){
+    const btn=document.getElementById('users-import-confirm-btn');
+    btn.style.display='inline-flex';
+    btn.innerHTML=`<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg> Importer ${usersImportParsed.length} utilisateur${usersImportParsed.length!==1?'s':''}`;
+  }
+}
+
+async function confirmUsersImport(){
+  if(!usersImportParsed.length)return;
+  const btn=document.getElementById('users-import-confirm-btn');
+  btn.disabled=true;btn.textContent='Import en cours…';
+  setSyncing(true);
+  let added=0,updated=0,errors=0;
+  for(const r of usersImportParsed){
+    const rec={...r};
+    delete rec._isUpdate;delete rec._dbId;
+    rec.updatedAt=FB.serverTimestamp();
+    try{
+      if(r._isUpdate&&r._dbId){
+        await FB.updateDoc(FB.doc(FB.db,'users',r._dbId),rec);updated++;
+      } else {
+        rec.createdAt=FB.serverTimestamp();
+        // Use email as doc ID hint — Firestore auto-id fallback
+        await FB.addDoc(FB.collection(FB.db,'users'),rec);added++;
+      }
+    }catch(e){errors++;console.error(e)}
+  }
+  closeUsersImport();setSyncing(false);btn.disabled=false;
+  toast(`Import terminé — ${added} ajouté${added!==1?'s':''}, ${updated} màj${errors?', '+errors+' erreur(s)':''}${newC?'. ⚠ Créez les comptes Firebase Auth manuellement.':''}`);
+}
+
+// ════════════════════════════════════════════════════════
 // GESTION UTILISATEURS (Firebase Auth + Firestore)
 // ════════════════════════════════════════════════════════
 function renderUsers(){
@@ -1841,6 +2065,15 @@ function renderUsers(){
       <div class="page-actions">
         <button class="btn btn-primary" onclick="showUserForm('add')">
           <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Ajouter
+        </button>
+        <button class="btn btn-blue" onclick="exportUsersXLSX()" style="background:#217346;border-color:#217346">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Export XLSX
+        </button>
+        <button class="btn btn-secondary" onclick="downloadUsersGabarit()">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
+        </button>
+        <button class="btn btn-secondary" onclick="openUsersImport()">
+          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer XLSX
         </button>
       </div>
     </div>
@@ -1935,6 +2168,36 @@ function deleteUser(id){
   });
 }
 </script>
+
+<!-- USERS IMPORT MODAL -->
+<div class="overlay" id="users-import-overlay" onclick="closeUsersImportOutside(event)">
+  <div class="import-modal">
+    <button class="modal-close" onclick="closeUsersImport()">✕</button>
+    <div style="font-family:var(--cond);font-size:18px;font-weight:800;color:#222;margin-bottom:4px">Importer des utilisateurs</div>
+    <div style="font-size:12px;color:#999;margin-bottom:16px;padding-bottom:14px;border-bottom:3px solid var(--charcoal)">Fichier .xlsx ou .csv — colonnes selon le gabarit</div>
+    <div style="background:#fffbe6;border:1px solid #f59e0b;border-left:3px solid #d97706;border-radius:3px;padding:9px 12px;font-size:12px;color:#78350f;margin-bottom:14px">
+      ⚠ L'import crée uniquement le <strong>profil Firestore</strong>. Chaque nouvel utilisateur doit avoir un compte créé manuellement dans <strong>Firebase Authentication</strong> pour pouvoir se connecter.
+    </div>
+    <div class="drop-zone" id="users-drop-zone"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleUsersDrop(event)"
+         onclick="document.getElementById('users-file-input').click()">
+      <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+      <p>Glissez votre fichier ici ou <strong>cliquez pour parcourir</strong><br/>.xlsx ou .csv</p>
+    </div>
+    <input type="file" id="users-file-input" accept=".xlsx,.csv" style="display:none" onchange="handleUsersFileSelect(this)"/>
+    <div class="import-stats" id="users-import-stats" style="display:none"></div>
+    <div class="import-log" id="users-import-log" style="display:none"></div>
+    <div id="users-import-preview-area" style="display:none">
+      <div class="import-preview" id="users-import-preview-table"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeUsersImport()">Annuler</button>
+        <button class="btn btn-primary" id="users-import-confirm-btn" style="display:none" onclick="confirmUsersImport()"></button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- AVIS INSTAL IMPORT MODAL -->
 <div class="overlay" id="avis-import-overlay" onclick="closeAvisImportOutside(event)">
