@@ -746,6 +746,12 @@ function toast(msg,type='ok'){
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function nowStr(){return new Date().toISOString().slice(0,10)}
+function fmtDate(s){
+  if(!s)return'—';
+  const d=new Date(s+'T12:00:00');
+  if(isNaN(d))return String(s);
+  return d.toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric'});
+}
 function badgeSt(s){
   const m=(s||'').toLowerCase();
   if(m.includes('avis'))return`<span class="badge badge-ok">Avis d'installation</span>`;
@@ -965,15 +971,15 @@ const COLS_ADMIN=[
   {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
   {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
   {k:'date_livraison',       l:'Date livraison assembleur',t:'date'},
-  {k:'type_client',          l:'Direct ou distributeur ?', t:'sel', opts:['Entrepreneur direct','Distributeur']},
+  {k:'type_client',          l:"Entrepreneur direct ou distributeur ?", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
   {k:'date_livraison_dist',  l:'Date livraison distributeur',t:'date'},
-  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
   {k:'notes_assembleur',     l:'Notes assembleur'},
   {k:'notes_distributeur',   l:'Notes distributeur'},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:'Identification du site'},
+  {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
   {k:'derniere_modif',       l:'Dernière modification', t:'date'},
   {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
@@ -994,13 +1000,13 @@ const COLS_ASM=[
   {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
   {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
   {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
-  {k:'type_client',          l:'Direct ou distributeur ?', t:'sel', opts:['Entrepreneur direct','Distributeur']},
+  {k:'type_client',          l:"Entrepreneur direct ou distributeur ?", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
-  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
   {k:'notes_assembleur',     l:'Notes assembleur'},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:'Identification du site'},
+  {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_DIST=[
@@ -1014,11 +1020,11 @@ const COLS_DIST=[
   {k:'nom_installateur',     l:'Installateur autorisé'},
   {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
   {k:'date_livraison_dist',  l:'Date livraison distributeur', t:'date'},
-  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
   {k:'notes_distributeur',   l:'Notes distributeur'},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:'Identification du site'},
+  {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
@@ -1029,12 +1035,12 @@ const COLS_CONS=[
   {k:'conseiller',           l:'Conseiller'},
   {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
   {k:'nom_installateur',     l:'Installateur autorisé'},
-  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
   {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:'Identification du site'},
+  {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut'},
 ];
 function getCols(){
@@ -1171,6 +1177,7 @@ function rowHtml(row,cols){
       return`<td><input type="text" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
     }
     if(c.k==='statut')return`<td>${badgeSt(v)}</td>`;
+    if(c.t==='date')return`<td style="white-space:nowrap">${fmtDate(v)}</td>`;
     if(c.hk)return`<td class="hk">${esc(v)||'—'}</td>`;
     return`<td>${esc(v)||'—'}</td>`;
   }).join('');
