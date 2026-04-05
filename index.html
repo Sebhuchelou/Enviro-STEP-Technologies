@@ -514,6 +514,15 @@ tbody tr:hover{background:#f8fbf5;}
 @media(max-width:1100px){.fcta h2{font-size:42px}.fgrid{grid-template-columns:1fr 1fr;gap:40px}.fbrand{grid-column:1/-1;padding-top:0}}
 @media(max-width:900px){.fcta{margin:0 auto;border-radius:34px;grid-template-columns:1fr;padding:30px 24px}.sbar{margin:0 auto;border-radius:0 0 24px 24px;flex-wrap:wrap}.fgrid{grid-template-columns:1fr}}
 @media(max-width:640px){.fcta h2{font-size:30px}.cform{grid-template-columns:1fr}}
+
+/* ── AVIS DETAIL PANEL ────────────────────────── */
+.avis-sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:4px}
+.avis-section{background:var(--cloud);border-radius:6px;padding:16px;border:1px solid var(--mist)}
+.avis-section-title{font-family:var(--cond);font-weight:700;font-size:.88rem;color:var(--charcoal);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--mist)}
+.detail-row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px dashed var(--mist);font-size:.8rem}
+.detail-row:last-child{border-bottom:none}
+.detail-label{color:var(--slate);flex-shrink:0;max-width:55%}
+.detail-val{color:var(--charcoal);font-weight:500;text-align:right;word-break:break-word}
 </style>
 </head>
 <body>
@@ -723,8 +732,10 @@ let session     = null;
 let pendingRole = null;
 let allRecords  = [];   // live from Firestore
 let allUsers    = [];   // live from Firestore
+let allAvis     = [];   // live from Firestore — AvisInstal collection
 let unsubRecords = null;
 let unsubUsers   = null;
+let unsubAvis    = null;
 let sortKey=null, sortDir='asc';
 let searchQ='', fAsm='', fDist='', fSt='';
 let editingId=null, editBuf={};
@@ -873,8 +884,9 @@ async function doLogin(){
 async function doLogout(){
   if(unsubRecords){unsubRecords();unsubRecords=null}
   if(unsubUsers){unsubUsers();unsubUsers=null}
+  if(unsubAvis){unsubAvis();unsubAvis=null}
   try{ await FB.signOut(FB.auth); }catch(e){}
-  session=null; allRecords=[]; allUsers=[];
+  session=null; allRecords=[]; allUsers=[]; allAvis=[];
   goHome();
 }
 function goHome(){
@@ -938,6 +950,14 @@ function startListeners(){
       snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
       if(currentPanel==='users') renderUsers();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
+
+    // AvisInstal listener (admin only)
+    const avisQuery = FB.query(FB.collection(FB.db,'AvisInstal'), FB.orderBy('createdAt','desc'));
+    unsubAvis = FB.onSnapshot(avisQuery, snap=>{
+      allAvis=[];
+      snap.forEach(d=>allAvis.push({id:d.id,...d.data()}));
+      if(currentPanel==='avis') renderAvis();
+    }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
   }
 }
 
@@ -948,6 +968,7 @@ function switchPanel(name,btn){
 }
 function renderPanel(){
   if(currentPanel==='tableau')renderTableau();
+  else if(currentPanel==='avis')renderAvis();
   else renderUsers();
 }
 
@@ -1599,6 +1620,246 @@ async function saveUserForm(){
 }
 
 function editUser(id){showUserForm('edit',id)}
+// ════════════════════════════════════════════════════════
+// AVIS D'INSTALLATION
+// ════════════════════════════════════════════════════════
+let avisSearch='', avisDetail=null;
+
+function renderAvis(){
+  const rows = avisSearch
+    ? allAvis.filter(a=>{
+        const q=avisSearch.toLowerCase();
+        const flat=JSON.stringify(a).toLowerCase();
+        return flat.includes(q);
+      })
+    : [...allAvis];
+
+  document.getElementById('app-main').innerHTML=`
+    <div class="page-header">
+      <div>
+        <div class="page-title">Avis d'installation</div>
+        <div class="page-sub">Données Firebase en temps réel — ${rows.length} avis</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-blue" onclick="exportAvisCSV()">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>Exporter CSV
+        </button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" placeholder="Recherche client, ville, entrepreneur…" value="${esc(avisSearch)}" oninput="avisSearch=this.value;renderAvis()"/>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="avisSearch='';renderAvis()">✕ Effacer</button>
+      <span class="result-info" style="margin-left:auto"><strong>${rows.length}</strong> résultat${rows.length!==1?'s':''}</span>
+    </div>
+    <div class="tbl-card">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Date prévue</th>
+            <th>Client</th>
+            <th>Téléphone</th>
+            <th>Courriel</th>
+            <th>Adresse du site</th>
+            <th>Ville</th>
+            <th>Province</th>
+            <th>Code postal</th>
+            <th>Région admin.</th>
+            <th>Conseiller régional</th>
+            <th>N° lot</th>
+            <th>Formation terrain</th>
+            <th>Entrepreneur</th>
+            <th>Tél. installateur</th>
+            <th>Courriel installateur</th>
+            <th>Attestation licence</th>
+            <th>Produit principal</th>
+            <th>Produit #2</th>
+            <th>Produit #3</th>
+            <th>Distributeur HK</th>
+            <th>Firme ing./technologue</th>
+            <th>Complété par</th>
+            <th>Note au distributeur</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(a=>avisRowHtml(a)).join('') : `<tr><td colspan="24"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis trouvé</p></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div id="avis-detail-panel"></div>`;
+
+  if(avisDetail) renderAvisDetail(avisDetail);
+}
+
+function avisRowHtml(a){
+  const s = a.identificationSiteInstallation || {};
+  const u = a.identificationUsagerSysteme || {};
+  const e = a.identificationEntrepreneur || {};
+  const p = a.choixProduitsInstaller || {};
+  const c = a.avisInstallationCompletePar || {};
+  const bool = v => v===true ? '<span class="badge badge-ok" style="font-size:.72rem">Oui</span>' : v===false ? '<span class="badge badge-def" style="font-size:.72rem">Non</span>' : '<span style="color:var(--silver)">—</span>';
+
+  return `<tr>
+    <td style="white-space:nowrap">${fmtDate(a.dateInstallationPrevues)}</td>
+    <td><strong>${esc((u.prenomClient||'')+' '+(u.nomClient||''))}</strong></td>
+    <td>${esc(u.telephone||'—')}</td>
+    <td style="font-size:.78rem">${esc(u.courriel||'—')}</td>
+    <td>${s.leClientNaPasAdresseNumeroLot ? '<em style="color:var(--slate);font-size:.78rem">N° lot</em>' : esc(s.numeroCiviqueRue||'—')}</td>
+    <td>${esc(s.ville||'—')}</td>
+    <td>${esc(s.province||'—')}</td>
+    <td>${esc(s.codePostal||'—')}</td>
+    <td>${esc(s.regionAdministrative||'—')}</td>
+    <td>${esc(s.votreConseillerRegional||'—')}</td>
+    <td>${esc(s.numeroLot||'—')}</td>
+    <td>${bool(a.formationRequiseSurTerrain)}</td>
+    <td><strong>${esc(e.nomEntreprise||'—')}</strong></td>
+    <td>${esc(e.telephone||'—')}</td>
+    <td style="font-size:.78rem">${esc(e.courrielInstallateur||'—')}</td>
+    <td>${bool(e.attestationLicence)}</td>
+    <td>${esc(p.produitPrincipal||'—')}</td>
+    <td>${esc(p.produit2||'—')}</td>
+    <td>${esc(p.produit3||'—')}</td>
+    <td>${esc(p.choixDistributeurHydroKinetic||'—')}</td>
+    <td>${esc(p.firmeTechnologueIngenieur||'—')}</td>
+    <td style="font-size:.78rem">${esc((c.prenom||'')+' '+(c.nom||''))}</td>
+    <td style="font-size:.78rem;max-width:160px;white-space:normal">${esc(c.noteAuDistributeur||'—')}</td>
+    <td class="td-actions">
+      <button class="row-btn edit-btn" onclick="openAvisDetail('${a.id}')" title="Voir la fiche complète">🔍</button>
+      <button class="row-btn del-btn" onclick="deleteAvis('${a.id}')" title="Supprimer">🗑</button>
+    </td>
+  </tr>`;
+}
+
+function openAvisDetail(id){
+  avisDetail = allAvis.find(a=>a.id===id)||null;
+  renderAvis();
+  setTimeout(()=>{const el=document.getElementById('avis-detail-panel');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},80);
+}
+
+function renderAvisDetail(a){
+  const panel = document.getElementById('avis-detail-panel');
+  if(!panel||!a)return;
+  const s = a.identificationSiteInstallation || {};
+  const u = a.identificationUsagerSysteme || {};
+  const e = a.identificationEntrepreneur || {};
+  const p = a.choixProduitsInstaller || {};
+  const c = a.avisInstallationCompletePar || {};
+  const bool = v => v===true?'<span class="badge badge-ok">Oui</span>':v===false?'<span class="badge badge-def">Non</span>':'—';
+  const row = (label,val) => val&&val!=='—'?`<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${val}</span></div>`:'';
+
+  panel.innerHTML=`
+    <div class="form-card" style="margin-top:24px;border-top:4px solid var(--blue)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div class="page-title" style="font-size:1.1rem">Fiche complète — Avis d'installation</div>
+          <div class="page-sub">ID Firebase : ${a.id}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="avisDetail=null;renderAvis()">✕ Fermer</button>
+      </div>
+
+      <div class="avis-sections">
+        <div class="avis-section">
+          <div class="avis-section-title">📅 Général</div>
+          ${row('Date prévue', fmtDate(a.dateInstallationPrevues))}
+          ${row('Formation terrain', bool(a.formationRequiseSurTerrain))}
+        </div>
+
+        <div class="avis-section">
+          <div class="avis-section-title">📍 Site d'installation</div>
+          ${row('Adresse', esc(s.numeroCiviqueRue))}
+          ${row('Ville', esc(s.ville))}
+          ${row('Province', esc(s.province))}
+          ${row('Code postal', esc(s.codePostal))}
+          ${row('Sans adresse (N° lot)', bool(s.leClientNaPasAdresseNumeroLot))}
+          ${row('N° lot', esc(s.numeroLot))}
+          ${row('Région administrative', esc(s.regionAdministrative))}
+          ${row('Conseiller régional', esc(s.votreConseillerRegional))}
+        </div>
+
+        <div class="avis-section">
+          <div class="avis-section-title">👤 Usager du système</div>
+          ${row('Prénom', esc(u.prenomClient))}
+          ${row('Nom', esc(u.nomClient))}
+          ${row('Téléphone', esc(u.telephone))}
+          ${row('Autre téléphone', esc(u.autreNumeroTelephone))}
+          ${row('Courriel', esc(u.courriel))}
+        </div>
+
+        <div class="avis-section">
+          <div class="avis-section-title">🏗 Entrepreneur</div>
+          ${row('Nom de l'entreprise', esc(e.nomEntreprise))}
+          ${row('Téléphone', esc(e.telephone))}
+          ${row('Courriel installateur', esc(e.courrielInstallateur))}
+          ${row('Attestation de licence', bool(e.attestationLicence))}
+        </div>
+
+        <div class="avis-section">
+          <div class="avis-section-title">🔧 Produits</div>
+          ${row('Produit principal', esc(p.produitPrincipal))}
+          ${row('Produit #2', esc(p.produit2))}
+          ${row('Produit #3', esc(p.produit3))}
+          ${row('Distributeur Hydro-Kinetic', esc(p.choixDistributeurHydroKinetic))}
+          ${row('Firme ing./technologue', esc(p.firmeTechnologueIngenieur))}
+        </div>
+
+        <div class="avis-section">
+          <div class="avis-section-title">✍️ Complété par</div>
+          ${row('Prénom', esc(c.prenom))}
+          ${row('Nom', esc(c.nom))}
+          ${row('Courriel', esc(c.courriel))}
+          ${row('Note au distributeur', esc(c.noteAuDistributeur))}
+        </div>
+      </div>
+    </div>`;
+}
+
+function deleteAvis(id){
+  const a=allAvis.find(x=>x.id===id);if(!a)return;
+  const u=a.identificationUsagerSysteme||{};
+  confirm2(`Supprimer l'avis de ${u.prenomClient||''} ${u.nomClient||''} ?
+Cette action est irréversible.`,async()=>{
+    setSyncing(true);
+    try{
+      await FB.deleteDoc(FB.doc(FB.db,'AvisInstal',id));
+      toast('Avis supprimé','warn');
+    }catch(ex){toast('Erreur: '+ex.message,'err')}
+    setSyncing(false);
+  });
+}
+
+function exportAvisCSV(){
+  const headers=['Date prévue','Prénom client','Nom client','Téléphone','Autre téléphone','Courriel client',
+    'Adresse site','Ville','Province','Code postal','N° lot','Région administrative','Conseiller régional','Formation terrain',
+    'Nom entrepreneur','Téléphone entrepreneur','Courriel installateur','Attestation licence',
+    'Produit principal','Produit #2','Produit #3','Distributeur HK','Firme ing./technologue',
+    'Complété par (prénom)','Complété par (nom)','Courriel','Note au distributeur'];
+  const toCSV = v => '"'+String(v||'').replace(/"/g,'""')+'"';
+  const lines = allAvis.map(a=>{
+    const s=a.identificationSiteInstallation||{};
+    const u=a.identificationUsagerSysteme||{};
+    const e=a.identificationEntrepreneur||{};
+    const p=a.choixProduitsInstaller||{};
+    const c=a.avisInstallationCompletePar||{};
+    return [
+      a.dateInstallationPrevues||'',u.prenomClient||'',u.nomClient||'',u.telephone||'',u.autreNumeroTelephone||'',u.courriel||'',
+      s.numeroCiviqueRue||'',s.ville||'',s.province||'',s.codePostal||'',s.numeroLot||'',s.regionAdministrative||'',s.votreConseillerRegional||'',a.formationRequiseSurTerrain===true?'Oui':'Non',
+      e.nomEntreprise||'',e.telephone||'',e.courrielInstallateur||'',e.attestationLicence===true?'Oui':'Non',
+      p.produitPrincipal||'',p.produit2||'',p.produit3||'',p.choixDistributeurHydroKinetic||'',p.firmeTechnologueIngenieur||'',
+      c.prenom||'',c.nom||'',c.courriel||'',c.noteAuDistributeur||''
+    ].map(toCSV).join(';');
+  });
+  const csv='﻿'+headers.map(toCSV).join(';')+'
+'+lines.join('
+');
+  const a2=document.createElement('a');
+  a2.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a2.download='AvisInstallation-'+nowStr()+'.csv';a2.click();
+  toast('Export CSV téléchargé');
+}
+
 
 function deleteUser(id){
   const u=allUsers.find(x=>x.id===id);if(!u)return;
