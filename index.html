@@ -2124,7 +2124,7 @@ function renderUsers(){
       </div>
       <div class="uc-actions">
         <button class="btn btn-secondary btn-sm" data-edit="${esc(u.id)}">✎ Modifier</button>
-        ${u.id!==session.id?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':'<span style="font-size:.74rem;color:var(--slate)">(votre compte)</span>'}
+        ${u.id!==session.id&&u.actif!==false?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':''}
         ${u.actif===false&&u.id!==session.id?'<button class="btn btn-danger btn-sm" data-permadel="'+esc(u.id)+'" style="background:var(--err);color:#fff;border-color:var(--err)">🗑 Supprimer de la BD</button>':''}
       </div>
     </div>`;
