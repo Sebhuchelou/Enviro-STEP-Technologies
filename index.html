@@ -2139,13 +2139,13 @@ function renderUsers(){
   mkBtn('btn-secondary', 'Gabarit XLSX',   iconDl,   ()=>downloadUsersGabarit());
   mkBtn('btn-secondary', 'Importer XLSX',  iconUp,   ()=>openUsersImport());
 
-  // Delegate edit/delete on cards
-  main.addEventListener('click',function handler(e){
-    const editId=e.target.closest('[data-edit]')&&e.target.closest('[data-edit]').dataset.edit;
-    const delId =e.target.closest('[data-del]') &&e.target.closest('[data-del]').dataset.del;
-    if(editId){main.removeEventListener('click',handler);editUser(editId);}
-    if(delId) {main.removeEventListener('click',handler);deleteUser(delId);}
-  });
+  // Delegate edit/delete on cards — global handler, no removeEventListener
+  main.onclick = function(e){
+    const editBtn = e.target.closest('[data-edit]');
+    const delBtn  = e.target.closest('[data-del]');
+    if(editBtn) editUser(editBtn.dataset.edit);
+    if(delBtn)  deleteUser(delBtn.dataset.del);
+  };
 
   if(userFormMode)renderUserForm();
 }
