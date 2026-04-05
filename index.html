@@ -2088,10 +2088,10 @@ function renderUsers(){
   const vc={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#7c3aed'};
   const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller'};
   const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller'};
-  const cards=allUsers.filter(u=>u.actif!==false).map(u=>{
+  const cards=allUsers.map(u=>{
     const init=((u.prenom||'?')[0]+((u.nom||'?')[0])).toUpperCase();
     const col=vc[u.role]||'#607d8b';
-    return`<div class="user-card ${vb[u.role]||''}">
+    return`<div class="user-card ${vb[u.role]||''}" style="${u.actif===false?'opacity:.6;border-left-color:#e5e7eb':''}">
       <div class="uc-head">
         <div class="uc-avatar" style="background:${col}">${init}</div>
         <div class="uc-info">
