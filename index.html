@@ -2084,11 +2084,28 @@ async function confirmUsersImport(){
 // ════════════════════════════════════════════════════════
 // GESTION UTILISATEURS (Firebase Auth + Firestore)
 // ════════════════════════════════════════════════════════
+let usersFilter = 'actif'; // 'actif' | 'inactif' | 'tous'
+
 function renderUsers(){
   const vc={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#7c3aed'};
   const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller'};
   const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller'};
-  const cards=allUsers.map(u=>{
+  const roleOrder={administrateur:0,assembleur:1,distributeur:2,conseiller:3};
+
+  // Filter
+  let filtered = allUsers.filter(u=>{
+    if(usersFilter==='actif')   return u.actif!==false;
+    if(usersFilter==='inactif') return u.actif===false;
+    return true;
+  });
+  // Sort by role then by name
+  filtered.sort((a,b)=>{
+    const ro=(roleOrder[a.role]??9)-(roleOrder[b.role]??9);
+    if(ro!==0)return ro;
+    return (a.nom||'').localeCompare(b.nom||'','fr');
+  });
+
+  const cards=filtered.map(u=>{
     const init=((u.prenom||'?')[0]+((u.nom||'?')[0])).toUpperCase();
     const col=vc[u.role]||'#607d8b';
     return`<div class="user-card ${vb[u.role]||''}" style="${u.actif===false?'opacity:.6;border-left-color:#e5e7eb':''}">
@@ -2112,18 +2129,27 @@ function renderUsers(){
     </div>`;
   }).join('');
 
+  const actifCount   = allUsers.filter(u=>u.actif!==false).length;
+  const inactifCount = allUsers.filter(u=>u.actif===false).length;
+
   const main=document.getElementById('app-main');
   main.innerHTML=
     '<div class="page-header">'
     +'<div><div class="page-title">Gestion des utilisateurs</div>'
-    +'<div class="page-sub">'+allUsers.length+' utilisateur'+(allUsers.length!==1?'s':'')+' — Les comptes sont gérés via Firebase Authentication</div>'
+    +'<div class="page-sub">'+filtered.length+' utilisateur'+(filtered.length!==1?'s affichés':' affiché')+' — classés par rôle</div>'
     +'</div>'
     +'<div class="page-actions" id="users-page-actions"></div>'
+    +'</div>'
+    // Filter tabs
+    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh)">'
+    +'<button id="uf-tab-actif"   onclick="usersFilter=\'actif\';renderUsers()"   style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='actif'?'var(--green)':'transparent')+';color:'+(usersFilter==='actif'?'var(--green-dark)':'var(--slate)')+';margin-bottom:-2px">Actifs <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='actif'?'var(--green-pale)':'var(--mist)')+';color:'+(usersFilter==='actif'?'var(--green-dark)':'var(--slate)')+'">'+actifCount+'</span></button>'
+    +'<button id="uf-tab-inactif" onclick="usersFilter=\'inactif\';renderUsers()" style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='inactif'?'var(--err)':'transparent')+';color:'+(usersFilter==='inactif'?'var(--err)':'var(--slate)')+';margin-bottom:-2px">Inactifs <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='inactif'?'var(--err-l)':'var(--mist)')+';color:'+(usersFilter==='inactif'?'var(--err)':'var(--slate)')+'">'+inactifCount+'</span></button>'
+    +'<button id="uf-tab-tous"    onclick="usersFilter=\'tous\';renderUsers()"    style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='tous'?'var(--blue)':'transparent')+';color:'+(usersFilter==='tous'?'var(--blue)':'var(--slate)')+';margin-bottom:-2px">Tous <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='tous'?'var(--blue-pale)':'var(--mist)')+';color:'+(usersFilter==='tous'?'var(--blue)':'var(--slate)')+'">'+allUsers.length+'</span></button>'
     +'</div>'
     +'<div id="uform-area"></div>'
     +'<div class="users-grid">'+(cards||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>')+'</div>';
 
-  // Build action buttons safely — no template literal nesting
+  // Build action buttons safely
   const actions=document.getElementById('users-page-actions');
   const mkBtn=(cls,label,icon,fn,extraStyle)=>{
     const b=document.createElement('button');
@@ -2137,10 +2163,10 @@ function renderUsers(){
   const iconXlsx='<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>';
   const iconDl='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
   const iconUp='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
-  mkBtn('btn-primary',   'Ajouter',        iconAdd,  ()=>showUserForm('add'));
-  mkBtn('btn-blue',      'Export XLSX',    iconXlsx, ()=>exportUsersXLSX(), 'background:#217346;border-color:#217346');
-  mkBtn('btn-secondary', 'Gabarit XLSX',   iconDl,   ()=>downloadUsersGabarit());
-  mkBtn('btn-secondary', 'Importer XLSX',  iconUp,   ()=>openUsersImport());
+  mkBtn('btn-primary',   'Ajouter',       iconAdd,  ()=>showUserForm('add'));
+  mkBtn('btn-blue',      'Export XLSX',   iconXlsx, ()=>exportUsersXLSX(), 'background:#217346;border-color:#217346');
+  mkBtn('btn-secondary', 'Gabarit XLSX',  iconDl,   ()=>downloadUsersGabarit());
+  mkBtn('btn-secondary', 'Importer XLSX', iconUp,   ()=>openUsersImport());
 
   // Delegate edit/delete on cards — global handler, no removeEventListener
   main.onclick = function(e){
