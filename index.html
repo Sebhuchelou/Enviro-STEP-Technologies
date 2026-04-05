@@ -2077,38 +2077,55 @@ function renderUsers(){
           <div class="uc-name">${esc(u.prenom||'')} ${esc(u.nom||'')}</div>
           <div class="uc-co">${esc(u.compagnie||'')} — ${esc(u.ville||'')}</div>
           <div class="uc-email">${esc(u.email||'')}</div>
-          ${(u.mrcs&&u.mrcs.length)?`<div class="uc-co">MRC : ${esc(u.mrcs.join(', '))}</div>`:''}
+          ${(u.mrcs&&u.mrcs.length)?'<div class="uc-co">MRC : '+esc(u.mrcs.join(', '))+'</div>':''}
         </div>
       </div>
       <span class="uc-role" style="background:${col}18;color:${col};border:1px solid ${col}33">${rl[u.role]||u.role}</span>
       <div class="uc-actions">
-        <button class="btn btn-secondary btn-sm" onclick="editUser('${u.id}')">✎ Modifier</button>
-        ${u.id!==session.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">🗑 Supprimer</button>`:'<span style="font-size:.74rem;color:var(--slate)">(votre compte)</span>'}
+        <button class="btn btn-secondary btn-sm" data-edit="${esc(u.id)}">✎ Modifier</button>
+        ${u.id!==session.id?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':'<span style="font-size:.74rem;color:var(--slate)">(votre compte)</span>'}
       </div>
     </div>`;
   }).join('');
-  document.getElementById('app-main').innerHTML=`
-    <div class="page-header">
-      <div><div class="page-title">Gestion des utilisateurs</div>
-        <div class="page-sub">${allUsers.length} utilisateur${allUsers.length!==1?'s':''} — Les comptes sont gérés via Firebase Authentication</div>
-      </div>
-      <div class="page-actions">
-        <button class="btn btn-primary" onclick='showUserForm("add")'>
-          <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Ajouter
-        </button>
-        <button class="btn btn-blue" onclick='exportUsersXLSX()' style="background:#217346;border-color:#217346">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Export XLSX
-        </button>
-        <button class="btn btn-secondary" onclick='downloadUsersGabarit()'>
-          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
-        </button>
-        <button class="btn btn-secondary" onclick='openUsersImport()'>
-          <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer XLSX
-        </button>
-      </div>
-    </div>
-    <div id="uform-area"></div>
-    <div class="users-grid">${cards||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>'}</div>`;
+
+  const main=document.getElementById('app-main');
+  main.innerHTML=
+    '<div class="page-header">'
+    +'<div><div class="page-title">Gestion des utilisateurs</div>'
+    +'<div class="page-sub">'+allUsers.length+' utilisateur'+(allUsers.length!==1?'s':'')+' — Les comptes sont gérés via Firebase Authentication</div>'
+    +'</div>'
+    +'<div class="page-actions" id="users-page-actions"></div>'
+    +'</div>'
+    +'<div id="uform-area"></div>'
+    +'<div class="users-grid">'+(cards||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>')+'</div>';
+
+  // Build action buttons safely — no template literal nesting
+  const actions=document.getElementById('users-page-actions');
+  const mkBtn=(cls,label,icon,fn,extraStyle)=>{
+    const b=document.createElement('button');
+    b.className='btn '+cls;
+    if(extraStyle)b.style.cssText=extraStyle;
+    b.innerHTML=icon+label;
+    b.addEventListener('click',fn);
+    actions.appendChild(b);
+  };
+  const iconAdd='<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+  const iconXlsx='<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>';
+  const iconDl='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+  const iconUp='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
+  mkBtn('btn-primary',   'Ajouter',        iconAdd,  ()=>showUserForm('add'));
+  mkBtn('btn-blue',      'Export XLSX',    iconXlsx, ()=>exportUsersXLSX(), 'background:#217346;border-color:#217346');
+  mkBtn('btn-secondary', 'Gabarit XLSX',   iconDl,   ()=>downloadUsersGabarit());
+  mkBtn('btn-secondary', 'Importer XLSX',  iconUp,   ()=>openUsersImport());
+
+  // Delegate edit/delete on cards
+  main.addEventListener('click',function handler(e){
+    const editId=e.target.closest('[data-edit]')&&e.target.closest('[data-edit]').dataset.edit;
+    const delId =e.target.closest('[data-del]') &&e.target.closest('[data-del]').dataset.del;
+    if(editId){main.removeEventListener('click',handler);editUser(editId);}
+    if(delId) {main.removeEventListener('click',handler);deleteUser(delId);}
+  });
+
   if(userFormMode)renderUserForm();
 }
 
