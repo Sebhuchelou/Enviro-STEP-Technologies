@@ -936,12 +936,15 @@ function startListeners(){
   document.getElementById('app-main').innerHTML=`<div class="table-spinner"><div class="sp2"></div>Chargement des données…</div>`;
 
   // Records listener
-  const recQuery = FB.query(FB.collection(FB.db,'records'), FB.orderBy('createdAt','desc'));
-  unsubRecords = FB.onSnapshot(recQuery, snap=>{
-    allRecords=[];
-    snap.forEach(d=>allRecords.push({id:d.id,...d.data()}));
-    if(currentPanel==='tableau') renderTableau();
-  }, err=>{ toast('Erreur lecture données: '+err.message,'err'); });
+  try {
+    const recQuery = FB.query(FB.collection(FB.db,'records'), FB.orderBy('createdAt','desc'));
+    unsubRecords = FB.onSnapshot(recQuery, snap=>{
+      allRecords=[];
+      snap.forEach(d=>allRecords.push({id:d.id,...d.data()}));
+      if(currentPanel==='tableau') renderTableau();
+    }, err=>{ toast('Erreur lecture données: '+err.message,'err'); renderTableau(); });
+  } catch(e){ toast('Erreur records: '+e.message,'err'); renderTableau(); }
+
 
   // Users listener (admin only)
   if(session.role==='administrateur'){
@@ -951,13 +954,20 @@ function startListeners(){
       if(currentPanel==='users') renderUsers();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
 
-    // AvisInstal listener (admin only)
-    const avisQuery = FB.query(FB.collection(FB.db,'AvisInstal'), FB.orderBy('createdAt','desc'));
-    unsubAvis = FB.onSnapshot(avisQuery, snap=>{
-      allAvis=[];
-      snap.forEach(d=>allAvis.push({id:d.id,...d.data()}));
-      if(currentPanel==='avis') renderAvis();
-    }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
+    // AvisInstal listener (admin only) — no orderBy to avoid index requirement
+    try {
+      unsubAvis = FB.onSnapshot(FB.collection(FB.db,'AvisInstal'), snap=>{
+        allAvis=[];
+        snap.forEach(d=>allAvis.push({id:d.id,...d.data()}));
+        // Sort client-side by createdAt desc
+        allAvis.sort((a,b)=>{
+          const ta=a.createdAt?.toMillis?a.createdAt.toMillis():0;
+          const tb=b.createdAt?.toMillis?b.createdAt.toMillis():0;
+          return tb-ta;
+        });
+        if(currentPanel==='avis') renderAvis();
+      }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
+    } catch(e){ toast('AvisInstal indisponible: '+e.message,'warn'); }
   }
 }
 
