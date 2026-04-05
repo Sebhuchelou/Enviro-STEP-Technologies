@@ -748,9 +748,10 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function nowStr(){return new Date().toISOString().slice(0,10)}
 function badgeSt(s){
   const m=(s||'').toLowerCase();
-  if(m.includes('complet'))return`<span class="badge badge-ok">Complet</span>`;
-  if(m.includes('attente'))return`<span class="badge badge-warn">En attente</span>`;
-  if(m.includes('anomalie'))return`<span class="badge badge-err">Anomalie</span>`;
+  if(m.includes('avis'))return`<span class="badge badge-ok">Avis d'installation</span>`;
+  if(m.includes('fabriqué'))return`<span class="badge badge-warn">Fabriqué</span>`;
+  if(m.includes('distributeur'))return`<span class="badge badge-def">Livré vers distributeur</span>`;
+  if(m.includes('entreprise'))return`<span class="badge badge-def" style="background:#e8f0fb;color:#154d8c">Livré vers entreprise</span>`;
   return`<span class="badge badge-def">${esc(s||'—')}</span>`;
 }
 function setSyncing(yes){
@@ -947,71 +948,94 @@ function renderPanel(){
 // ════════════════════════════════════════════════════════
 // COLONNES
 // ════════════════════════════════════════════════════════
+const STATUT_OPTS=['Avis d\'installation','Fabriqué','Livré vers distributeur','Livré vers entreprise'];
 const COLS_ADMIN=[
-  {k:'po_assembleur',l:'#PO Assembleur'},
-  {k:'po_norweco',l:'#PO Norweco'},
-  {k:'recu_le',l:'Reçu le',t:'date'},
-  {k:'no_serie_hk',l:'N° Série HK',hk:true},
-  {k:'date_livraison',l:'Date livraison',t:'date'},
-  {k:'type_client',l:'Direct/Dist.',t:'sel',opts:['Direct','Distributeur']},
-  {k:'nom_distributeur',l:'Distributeur'},
-  {k:'nom_client_direct',l:'Client direct'},
-  {k:'adresse_direct',l:'Adresse (direct)'},
-  {k:'ville_direct',l:'Ville (direct)'},
-  {k:'adresse_dist',l:'Adresse (dist.)'},
-  {k:'ville_dist',l:'Ville (dist.)'},
-  {k:'produit_principal',l:'Produit principal'},
-  {k:'produit2',l:'Produit #2'},
-  {k:'produit3',l:'Produit #3'},
-  {k:'nom_installateur',l:'Installateur'},
-  {k:'notes_assembleur',l:'Notes'},
-  {k:'mrc',l:'MRC'},
-  {k:'assembleur',l:'Assembleur'},
-  {k:'distributeur',l:'Distributeur'},
-  {k:'mrc',l:'MRC'},
-  {k:'statut',l:'Statut',t:'sel',opts:['En attente','Complet','Anomalie']},
-  {k:'derniere_modif',l:'Dernière modif.',t:'date'},
-  {k:'dernier_utilisateur',l:'Dernier utilisateur'},
+  {k:'po_assembleur',        l:'#PO Assembleur'},
+  {k:'po_norweco',           l:'#PO Norweco'},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
+  {k:'recu_le',              l:'Date réception assembleur',t:'date'},
+  {k:'no_serie_hk',          l:'N° Série HK',hk:true},
+  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'produit2',             l:'Produit #2'},
+  {k:'produit3',             l:'Produit #3'},
+  {k:'conseiller',           l:'Conseiller'},
+  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
+  {k:'nom_installateur',     l:'Installateur autorisé'},
+  {k:'hydro_prime_cumules',  l:'Hydro-prime cumulés ($)',  t:'num'},
+  {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
+  {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
+  {k:'date_livraison',       l:'Date livraison assembleur',t:'date'},
+  {k:'type_client',          l:'Direct ou distributeur ?', t:'sel', opts:['Entrepreneur direct','Distributeur']},
+  {k:'nom_distributeur',     l:'Nom du distributeur'},
+  {k:'date_livraison_dist',  l:'Date livraison distributeur',t:'date'},
+  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'notes_assembleur',     l:'Notes assembleur'},
+  {k:'notes_distributeur',   l:'Notes distributeur'},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
+  {k:'identification_site',  l:'Identification du site'},
+  {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
+  {k:'derniere_modif',       l:'Dernière modification', t:'date'},
+  {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
 ];
 const COLS_ASM=[
-  {k:'po_assembleur',l:'#PO Assembleur'},
-  {k:'po_norweco',l:'#PO Norweco'},
-  {k:'no_serie_hk',l:'N° Série HK',hk:true},
-  {k:'date_livraison',l:'Date livraison',t:'date'},
-  {k:'type_client',l:'Direct/Dist.',t:'sel',opts:['Direct','Distributeur']},
-  {k:'nom_distributeur',l:'Nom distributeur'},
-  {k:'nom_client_direct',l:'Client direct'},
-  {k:'adresse_direct',l:'Adresse (direct)'},
-  {k:'ville_direct',l:'Ville (direct)'},
-  {k:'produit_principal',l:'Produit principal'},
-  {k:'produit2',l:'Produit #2'},
-  {k:'produit3',l:'Produit #3'},
-  {k:'assembleur',l:'Assembleur'},
-  {k:'notes_assembleur',l:'Notes'},
+  {k:'po_assembleur',        l:'#PO Assembleur'},
+  {k:'po_norweco',           l:'#PO Norweco'},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
+  {k:'recu_le',              l:'Date réception assembleur', t:'date'},
+  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
+  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'produit2',             l:'Produit #2'},
+  {k:'produit3',             l:'Produit #3'},
+  {k:'conseiller',           l:'Conseiller'},
+  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
+  {k:'nom_installateur',     l:'Installateur autorisé'},
+  {k:'hydro_prime_cumules',  l:'Hydro-prime cumulés ($)',  t:'num'},
+  {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
+  {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
+  {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
+  {k:'type_client',          l:'Direct ou distributeur ?', t:'sel', opts:['Entrepreneur direct','Distributeur']},
+  {k:'nom_distributeur',     l:'Nom du distributeur'},
+  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'notes_assembleur',     l:'Notes assembleur'},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
+  {k:'identification_site',  l:'Identification du site'},
+  {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_DIST=[
-  {k:'recu_le',l:'Reçu le',t:'date'},
-  {k:'no_serie_hk',l:'N° Série HK',hk:true},
-  {k:'date_livraison',l:'Date livraison',t:'date'},
-  {k:'nom_client_direct',l:'Nom client'},
-  {k:'adresse_dist',l:'Adresse livraison'},
-  {k:'ville_dist',l:'Ville livraison'},
-  {k:'produit_principal',l:'Produit principal'},
-  {k:'produit2',l:'Produit #2'},
-  {k:'produit3',l:'Produit #3'},
-  {k:'nom_installateur',l:'Installateur'},
-  {k:'mrc',l:'MRC'},
-  {k:'distributeur',l:'Distributeur'},
+  {k:'po_assembleur',        l:'#PO Assembleur'},
+  {k:'po_norweco',           l:'#PO Norweco'},
+  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
+  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'produit2',             l:'Produit #2'},
+  {k:'produit3',             l:'Produit #3'},
+  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
+  {k:'nom_installateur',     l:'Installateur autorisé'},
+  {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
+  {k:'date_livraison_dist',  l:'Date livraison distributeur', t:'date'},
+  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'notes_distributeur',   l:'Notes distributeur'},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
+  {k:'identification_site',  l:'Identification du site'},
+  {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
-  {k:'no_serie_hk',l:'N° Série HK',hk:true},
-  {k:'mrc',l:'MRC'},
-  {k:'produit_principal',l:'Produit principal'},
-  {k:'nom_client_direct',l:'Client direct'},
-  {k:'nom_distributeur',l:'Distributeur'},
-  {k:'assembleur',l:'Assembleur'},
-  {k:'ville_direct',l:'Ville'},
-  {k:'statut',l:'Statut'}
+  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
+  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'produit2',             l:'Produit #2'},
+  {k:'produit3',             l:'Produit #3'},
+  {k:'conseiller',           l:'Conseiller'},
+  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
+  {k:'nom_installateur',     l:'Installateur autorisé'},
+  {k:'adresse_site',         l:'Adresse du site'},
+  {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
+  {k:'nom_distributeur',     l:'Nom du distributeur'},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
+  {k:'identification_site',  l:'Identification du site'},
+  {k:'statut',               l:'Statut'},
 ];
 function getCols(){
   if(session.role==='administrateur')return COLS_ADMIN;
@@ -1021,19 +1045,18 @@ function getCols(){
 }
 function getRows(){
   let rows=[...allRecords];
-  if(session.role==='assembleur')rows=rows.filter(r=>r.assembleur===session.compagnie);
+  if(session.role==='assembleur')rows=rows.filter(r=>r.nom_assembleur===session.compagnie||r.assembleur_dist===session.compagnie);
   else if(session.role==='distributeur'){
-    rows=rows.filter(r=>r.distributeur===session.compagnie);
-    // Filter by active assembler tab
-    if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.assembleur===activeAsmTab);
+    rows=rows.filter(r=>r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie);
+    if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab||r.assembleur_dist===activeAsmTab);
   }
   else if(session.role==='conseiller'){
     const allowed=Array.isArray(session.mrcs)?session.mrcs:[];
-    rows=rows.filter(r=>allowed.includes(r.mrc));
+    rows=rows.filter(r=>allowed.includes(r.ville_livraison)||allowed.includes(r.mrc));
   }
   if(searchQ){const q=searchQ.toLowerCase();rows=rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)))}
-  if(fAsm)rows=rows.filter(r=>r.assembleur===fAsm);
-  if(fDist)rows=rows.filter(r=>r.distributeur===fDist);
+  if(fAsm)rows=rows.filter(r=>r.nom_assembleur===fAsm||r.assembleur_dist===fAsm);
+  if(fDist)rows=rows.filter(r=>r.nom_distributeur===fDist);
   if(fSt)rows=rows.filter(r=>r.statut===fSt);
   if(sortKey)rows.sort((a,b)=>{const va=String(a[sortKey]||'').toLowerCase(),vb=String(b[sortKey]||'').toLowerCase();return sortDir==='asc'?va.localeCompare(vb,'fr'):vb.localeCompare(va,'fr')});
   return rows;
@@ -1051,15 +1074,14 @@ function renderTableau(){
   // For distributeur: get assemblers that have records for this distributor
   let distAsmTabs = [];
   if(isDist){
-    const myRecs = allRecords.filter(r=>r.distributeur===session.compagnie);
-    distAsmTabs = [...new Set(myRecs.map(r=>r.assembleur).filter(Boolean))].sort();
-    // Validate activeAsmTab is still valid
+    const myRecs = allRecords.filter(r=>r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie);
+    distAsmTabs = [...new Set(myRecs.map(r=>r.nom_assembleur||r.assembleur_dist).filter(Boolean))].sort();
     if(activeAsmTab!=='__all__' && !distAsmTabs.includes(activeAsmTab)) activeAsmTab='__all__';
   }
 
   const rows=getRows();
-  const asms=[...new Set(allRecords.map(r=>r.assembleur).filter(Boolean))].sort();
-  const dists=[...new Set(allRecords.map(r=>r.distributeur).filter(Boolean))].sort();
+  const asms=[...new Set(allRecords.map(r=>r.nom_assembleur||r.assembleur_dist).filter(Boolean))].sort();
+  const dists=[...new Set(allRecords.map(r=>r.nom_distributeur).filter(Boolean))].sort();
   const sts=[...new Set(allRecords.map(r=>r.statut).filter(Boolean))].sort();
 
   const filters=isAdmin?`
@@ -1081,10 +1103,10 @@ function renderTableau(){
     <div class="asm-tabs-bar">
       <button class="asm-tab asm-tab-all ${activeAsmTab==='__all__'?'active':''}" onclick="setAsmTab('__all__')">
         Tous les assembleurs
-        <span class="tab-count">${allRecords.filter(r=>r.distributeur===session.compagnie).length}</span>
+        <span class="tab-count">${allRecords.filter(r=>r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie).length}</span>
       </button>
       ${distAsmTabs.map(a=>{
-        const cnt=allRecords.filter(r=>r.distributeur===session.compagnie&&r.assembleur===a).length;
+        const cnt=allRecords.filter(r=>(r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie)&&(r.nom_assembleur===a||r.assembleur_dist===a)).length;
         return`<button class="asm-tab ${activeAsmTab===a?'active':''}" onclick="setAsmTab('${a.replace(/'/g,"\'")}')">${a}<span class="tab-count">${cnt}</span></button>`;
       }).join('')}
     </div>` : '';
@@ -1144,6 +1166,7 @@ function rowHtml(row,cols){
     if(isE){
       if(c.t==='sel'){const o=c.opts.map(x=>`<option value="${esc(x)}"${v===x?' selected':''}>${esc(x)}</option>`).join('');return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
       if(c.t==='date')return`<td><input type="date" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
+      if(c.t==='num')return`<td><input type="number" step="0.01" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value" style="width:90px"/></td>`;
       if(c.k==='dernier_utilisateur'||c.k==='derniere_modif')return`<td>${esc(v)||'—'}</td>`;
       return`<td><input type="text" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
     }
@@ -1201,15 +1224,24 @@ async function deleteRow(id){
 async function addRow(){
   const newHK='HK-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-4);
   const nr={
-    po_assembleur:'',po_norweco:'',recu_le:nowStr(),
-    no_serie_hk:newHK,
-    date_livraison:'',type_client:'Direct',nom_distributeur:'',nom_client_direct:'',
-    adresse_direct:'',ville_direct:'',adresse_dist:'',ville_dist:'',
-    produit_principal:'',produit2:'',produit3:'',nom_installateur:'',notes_assembleur:'',mrc:'',
-    assembleur:session.role==='assembleur'?session.compagnie:'',
-    distributeur:session.role==='distributeur'?session.compagnie:'',
-    derniere_modif:nowStr(),dernier_utilisateur:session.email,statut:'En attente',
-    createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()
+    po_assembleur:'', po_norweco:'',
+    nom_assembleur: session.role==='assembleur'?session.compagnie:'',
+    recu_le: nowStr(),
+    no_serie_hk: newHK,
+    produit_principal:'', produit2:'', produit3:'',
+    conseiller:'', nom_entrepreneur:'', nom_installateur:'',
+    hydro_prime_cumules:'', hydro_prime_utilises:'', hydro_prime_restants:'',
+    date_livraison:'',
+    type_client:'Entrepreneur direct',
+    nom_distributeur:'',
+    date_livraison_dist:'',
+    adresse_site:'', ville_livraison:'',
+    notes_assembleur:'', notes_distributeur:'',
+    assembleur_dist: session.role==='assembleur'?session.compagnie:session.role==='distributeur'?session.compagnie:'',
+    identification_site:'',
+    statut:"Fabriqué",
+    derniere_modif: nowStr(), dernier_utilisateur: session.email,
+    createdAt: FB.serverTimestamp(), updatedAt: FB.serverTimestamp()
   };
   setSyncing(true);
   try{
@@ -1248,16 +1280,32 @@ function exportCSV(){
 // TEMPLATE + IMPORT
 // ════════════════════════════════════════════════════════
 function downloadTemplate(){
-  const headers=['#PO Assembleur','#PO Norweco','Reçu le','Numéro de série HK','Date de livraison',
-    'Client direct ou distributeur ?','Nom du distributeur','Nom du client direct',
-    'Adresse de livraison (direct)','Ville de livraison (direct)',
-    'Adresse de livraison (distributeur)','Ville de livraison (distributeur)',
+  const headers=[
+    '#PO Assembleur','#PO Norweco',"Nom de l'Assembleur",
+    'Date de réception chez l\'assembleur','Numéro de série HK',
     'Produit Principal','Produit #2','Produit #3',
-    "Nom de l'entreprise de l'installateur","Notes de l'assembleur",
-    'Assembleur','Distributeur','MRC','Statut'];
-  const example=['ASM-2026-001','NOR-0001','2026-01-15','HK-2026-0001','2026-02-01',
-    'Direct','','Jean Dupont','123 Rue Principale','Québec','','',
-    'Hydro-Kinetic HK-100','','','','','Assemblages HK','','Bellechasse','En attente'];
+    'Conseiller',"Nom de l'entrepreneur",'Installateur autorisé',
+    'Hydro-prime cumulés ($)','Hydro-prime utilisés ($)','Hydro-prime restants ($)',
+    'Date de livraison en provenance de l\'assembleur',
+    'Entrepreneur direct ou distributeur ?','Nom du distributeur',
+    'Date de livraison en provenance du distributeur',
+    "Adresse du site d'installation",'Ville de livraison',
+    "Notes de l'assembleur (si requis)",'Notes du distributeur (si requis)',
+    'Assembleur/Distributeur',"Identification du site d'installation",
+    'Statut','Dernière modification','Dernier utilisateur'
+  ];
+  const example=['ASM-2026-001','NOR-0001','Assemblages HK Inc.',
+    '2026-01-15','HK-2026-0001',
+    'Hydro-Kinetic HK-100','','',
+    'Jean Tremblay','Constructions Lapointe inc.','Installations Verts',
+    '1500','250','1250',
+    '2026-02-01',
+    'Entrepreneur direct','',
+    '',
+    '123 Rue Principale','Québec',
+    '','','Assemblages HK Inc.','STE-CLAIRE-2026-001',
+    'Fabriqué','2026-02-01','admin@enviro-step.ca'
+  ];
   const csv='\uFEFF'+headers.join(';')+'\n'+example.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
@@ -1289,16 +1337,49 @@ function processImportFile(file){
   else{r.onload=e=>parseXLSXImport(e.target.result);r.readAsArrayBuffer(file)}
 }
 
-const IMPORT_MAP={'#po assembleur':'po_assembleur','#po norweco':'po_norweco','reçu le':'recu_le',
-  'numéro de série hk':'no_serie_hk','date de livraison':'date_livraison',
-  'client direct ou distributeur ?':'type_client','nom du distributeur':'nom_distributeur',
-  'nom du client direct':'nom_client_direct','adresse de livraison (direct)':'adresse_direct',
-  'ville de livraison (direct)':'ville_direct','adresse de livraison (distributeur)':'adresse_dist',
-  'ville de livraison (distributeur)':'ville_dist','produit principal':'produit_principal',
-  'produit #2':'produit2','produit #3':'produit3',
+const IMPORT_MAP={
+  '#po assembleur':'po_assembleur',
+  '#po norweco':'po_norweco',
+  "nom de l'assembleur":'nom_assembleur',
+  'date de réception chez l\'assembleur':'recu_le',
+  'date réception assembleur':'recu_le',
+  'reçu le':'recu_le',
+  'numéro de série hk':'no_serie_hk',
+  'produit principal':'produit_principal',
+  'produit #2':'produit2',
+  'produit #3':'produit3',
+  'conseiller':'conseiller',
+  "nom de l'entrepreneur":'nom_entrepreneur',
+  'installateur autorisé':'nom_installateur',
   "nom de l'entreprise de l'installateur":'nom_installateur',
-  "notes de l'assembleur":'notes_assembleur','assembleur':'assembleur',
-  'distributeur':'distributeur','mrc':'mrc','statut':'statut'};
+  'hydro-prime cumulés ($)':'hydro_prime_cumules',
+  'hydro-prime cumulés':'hydro_prime_cumules',
+  'hydro-prime utilisés ($)':'hydro_prime_utilises',
+  'hydro-prime utilisés':'hydro_prime_utilises',
+  'hydro-prime restants ($)':'hydro_prime_restants',
+  'hydro-prime restants':'hydro_prime_restants',
+  'date de livraison en provenance de l\'assembleur':'date_livraison',
+  'date livraison assembleur':'date_livraison',
+  'date de livraison':'date_livraison',
+  'entrepreneur direct ou distributeur ?':'type_client',
+  'client direct ou distributeur ?':'type_client',
+  'nom du distributeur':'nom_distributeur',
+  'date de livraison en provenance du distributeur':'date_livraison_dist',
+  'date livraison distributeur':'date_livraison_dist',
+  "adresse du site d'installation":'adresse_site',
+  'adresse du site':'adresse_site',
+  'ville de livraison':'ville_livraison',
+  "notes de l'assembleur (si requis)":'notes_assembleur',
+  "notes de l'assembleur":'notes_assembleur',
+  'notes du distributeur (si requis)':'notes_distributeur',
+  'notes du distributeur':'notes_distributeur',
+  'assembleur/distributeur':'assembleur_dist',
+  "identification du site d'installation":'identification_site',
+  'identification du site':'identification_site',
+  'statut':'statut',
+  'dernière modification':'derniere_modif',
+  'dernier utilisateur':'dernier_utilisateur',
+};
 
 function parseCSVImport(text){
   if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
