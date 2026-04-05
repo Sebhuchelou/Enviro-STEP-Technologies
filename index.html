@@ -773,7 +773,7 @@ function confirm2(msg,cb){
   document.getElementById('confirm-overlay').classList.add('open');
 }
 function closeConfirm(){document.getElementById('confirm-overlay').classList.remove('open');confirmCb=null}
-document.getElementById('conf-yes').onclick=()=>{closeConfirm();if(confirmCb)confirmCb()};
+document.getElementById('conf-yes').onclick=()=>{const cb=confirmCb;closeConfirm();if(cb)cb()};
 
 // ════════════════════════════════════════════════════════
 // LOGIN / LOGOUT
