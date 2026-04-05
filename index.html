@@ -1894,15 +1894,28 @@ let uiParsed = [];
 
 function openUsersImport(){
   uiParsed = [];
-  document.getElementById('ui-preview-area').style.display = 'none';
-  document.getElementById('ui-file-input').value = '';
-  document.getElementById('users-import-overlay').style.display = 'block';
-  document.getElementById('ui-file-input').onchange = function(){ if(this.files[0]) uiProcessFile(this.files[0]); };
-  document.getElementById('ui-confirm-btn').onclick = confirmUsersImport;
+  const overlay = document.getElementById('users-import-overlay');
+  const preview = document.getElementById('ui-preview-area');
+  const fileInput = document.getElementById('ui-file-input');
+  const confirmBtn = document.getElementById('ui-confirm-btn');
+  const summary = document.getElementById('ui-summary');
+  const previewBody = document.getElementById('ui-preview-body');
+  const previewHead = document.getElementById('ui-preview-head');
+  const importCount = document.getElementById('ui-import-count');
+
+  if(preview)  preview.style.display = 'none';
+  if(fileInput){ fileInput.value = ''; fileInput.onchange = e => { if(e.target.files[0]) uiProcessFile(e.target.files[0]); }; }
+  if(summary)  summary.innerHTML = '';
+  if(previewBody) previewBody.innerHTML = '';
+  if(previewHead) previewHead.innerHTML = '';
+  if(importCount) importCount.textContent = '';
+  if(confirmBtn){ confirmBtn.disabled=false; confirmBtn.style.opacity='1'; confirmBtn.onclick = confirmUsersImport; }
+  if(overlay) overlay.style.display = 'block';
 }
 
 function closeUsersImport(){
-  document.getElementById('users-import-overlay').style.display = 'none';
+  const overlay = document.getElementById('users-import-overlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 function usersImportDrop(e){
