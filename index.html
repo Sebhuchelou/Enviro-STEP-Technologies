@@ -2079,16 +2079,31 @@ async function confirmUsersImport(){
         await FB.addDoc(FB.collection(FB.db,'users'), rec);
         added++;
       } else {
-        const resp = await fetch(
-          'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY,
-          { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({email:rec.email, password:pass, returnSecureToken:false}) }
-        );
-        const data = await resp.json();
-        if(data.error){ errors++; toast('⚠ '+rec.email+' : '+data.error.message,'err'); continue; }
-        await FB.setDoc(FB.doc(FB.db,'users', data.localId), rec, {merge:true});
-        added++;
-        // Délai pour éviter le rate limit Firebase Auth
+        // Retry loop pour gérer TOO_MANY_ATTEMPTS
+        let authDone = false;
+        for(let attempt = 1; attempt <= 3; attempt++){
+          const resp = await fetch(
+            'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY,
+            { method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({email:rec.email, password:pass, returnSecureToken:false}) }
+          );
+          const data = await resp.json();
+          if(data.error){
+            if(data.error.message === 'TOO_MANY_ATTEMPTS_TRY_LATER' && attempt < 3){
+              btn.textContent = 'Pause Firebase (tentative '+attempt+'/3)… attente 30s';
+              await new Promise(r => setTimeout(r, 30000));
+              continue;
+            }
+            errors++;
+            toast('⚠ '+rec.email+' : '+data.error.message,'err');
+            break;
+          }
+          await FB.setDoc(FB.doc(FB.db,'users', data.localId), rec, {merge:true});
+          added++;
+          authDone = true;
+          break;
+        }
+        // Délai entre chaque compte pour ralentir les appels
         await new Promise(r => setTimeout(r, 2000));
       }
     } catch(e){ errors++; console.error(e); }
