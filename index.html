@@ -949,13 +949,15 @@ function startListeners(){
       if(currentPanel==='users') renderUsers();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
 
-    // AvisInstal listener
+  // AvisInstal listener (admin + assembleur)
+  if(session.role==='administrateur'||session.role==='assembleur'){
     const aiQuery = FB.collection(FB.db,'AvisInstal');
     window._unsubAvisInstal = FB.onSnapshot(aiQuery, snap=>{
       window.allAvisInstal=[];
       snap.forEach(d=>window.allAvisInstal.push({id:d.id,...d.data()}));
       if(currentPanel==='avisInstal') renderAvisInstal();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
+  }
   }
 }
 
@@ -1134,8 +1136,15 @@ function renderTableauFiltered(){
   const allCols=getCols();
 
   const tblRows=rows.length
-    ?rows.map(r=>rowHtml(r,allCols)).join('')
-    :`<tr><td colspan="${allCols.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
+    ?rows.map(r=>{
+      const base=rowHtml(r,allCols);
+      // Inject Avis button as first cell after removing last </tr>
+      const avisBtn = asmView==='avis'
+        ? `<td style="padding:6px 8px;white-space:nowrap"><button onclick="openAvisPopup('${esc(r.no_serie_hk||'')}',event)" style="padding:5px 11px;border-radius:3px;background:var(--blue);border:none;color:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#fff"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Avis</button></td>`
+        : '';
+      return base.replace('<tr ', '<tr ').replace('</tr>', avisBtn+'</tr>');
+    }).join('')
+    :`<tr><td colspan="${allCols.length+(asmView==='avis'?2:1)}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
@@ -1158,6 +1167,7 @@ function renderTableauFiltered(){
       <div class="tbl-scroll">
         <table>
           <thead><tr>
+            ${asmView==='avis'?'<th style="white-space:nowrap">Avis</th>':''}
             ${allCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
             <th>Actions</th>
           </tr></thead>
@@ -2158,8 +2168,95 @@ function renderAvisInstal(){
 }
 
 // ════════════════════════════════════════════════════════
-// GESTION UTILISATEURS — XLSX EXPORT / IMPORT
+// POPUP AVIS D'INSTALLATION
 // ════════════════════════════════════════════════════════
+function openAvisPopup(noSerieHk, e){
+  if(e) e.stopPropagation();
+  const avis=(window.allAvisInstal||[]).find(a=>a.no_serie_hk===noSerieHk);
+  const overlay=document.getElementById('avis-popup-overlay');
+  const content=document.getElementById('avis-popup-content');
+
+  if(!avis){
+    content.innerHTML=`<div style="padding:40px;text-align:center;color:var(--slate)">
+      <div style="font-size:2rem;margin-bottom:12px">📋</div>
+      <div style="font-family:var(--cond);font-size:1rem;font-weight:700;color:var(--charcoal);margin-bottom:6px">Aucun avis trouvé</div>
+      <div style="font-size:.84rem">Aucun avis d'installation associé au N° <strong>${esc(noSerieHk)}</strong></div>
+    </div>`;
+    overlay.style.display='flex';
+    return;
+  }
+
+  const row=(label,val)=>val?`
+    <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+      <span style="font-size:.75rem;font-weight:600;color:var(--slate);min-width:180px;flex-shrink:0">${label}</span>
+      <span style="font-size:.82rem;color:var(--charcoal)">${esc(String(val))}</span>
+    </div>`:'';
+
+  const section=(title,icon)=>`
+    <div style="font-family:var(--cond);font-size:.82rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--blue);margin:18px 0 8px;display:flex;align-items:center;gap:6px">
+      <span>${icon}</span>${title}
+    </div>`;
+
+  const multiVal=v=>Array.isArray(v)?v.join(', '):(v||'—');
+
+  content.innerHTML=`
+    <div style="padding:22px 24px 8px;border-bottom:2px solid var(--blue);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:var(--charcoal)">Avis d'installation</div>
+        <div style="font-size:.8rem;color:var(--blue);margin-top:2px;font-weight:600">N° Série HK : ${esc(noSerieHk)}</div>
+      </div>
+      <button onclick="document.getElementById('avis-popup-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer;padding:4px">✕</button>
+    </div>
+    <div style="padding:8px 24px 24px;overflow-y:auto;max-height:calc(85vh - 80px)">
+
+      ${section('Installation','📅')}
+      ${row("Date d'installation prévue", avis.date_installation)}
+
+      ${section('Site d\'installation','📍')}
+      ${row('Numéro civique, rue', avis.no_civique_rue)}
+      ${row('Ville', avis.ville_site)}
+      ${row('Province', avis.province_site)}
+      ${row('Code postal', avis.code_postal_site)}
+      ${row('Numéro de lot', avis.no_lot)}
+      ${row('Région administrative', avis.region_admin)}
+      ${row('Conseiller régional', avis.conseiller_regional)}
+
+      ${section('Client (propriétaire)','👤')}
+      ${row('Prénom', avis.prenom_client)}
+      ${row('Nom', avis.nom_client)}
+      ${row('Téléphone', avis.tel_client)}
+      ${row('Autre téléphone', avis.autre_tel_client)}
+      ${row('Courriel', avis.courriel_client)}
+
+      ${section('Installateur autorisé','🔧')}
+      ${row('Entreprise', avis.nom_entreprise_install)}
+      ${row('Courriel', avis.courriel_installateur)}
+      ${row('Téléphone', avis.tel_installateur)}
+      ${row('Atteste posséder la licence', avis.atteste_licence?'✅ Oui':'—')}
+
+      ${section('Produits','📦')}
+      ${row('Produit principal', avis.produit_principal)}
+      ${row('Produit #2', avis.produit2)}
+      ${row('Produit #3', avis.produit3)}
+      ${row('Distributeur HYDRO-KINETIC', avis.distributeur_hk)}
+
+      ${section('Options','⚙️')}
+      ${row('Longueur des fils HK', multiVal(avis.longueur_fils_hk))}
+      ${row('Extensions de conduites', multiVal(avis.extensions_conduites))}
+      ${row('Rallonges de cheminées', multiVal(avis.rallonges_cheminees))}
+      ${row('Autres produits', avis.autres_produits)}
+
+      ${section('Complété par','✍️')}
+      ${row('Firme technologue/ingénieur', avis.firme_technologue)}
+      ${row('Prénom', avis.prenom_completeur)}
+      ${row('Nom', avis.nom_completeur)}
+      ${row('Courriel', avis.courriel_completeur)}
+      ${row('Note au distributeur', avis.note_distributeur)}
+    </div>`;
+
+  overlay.style.display='flex';
+}
+
 const USER_COLS=[
   {k:'prenom',       l:'Prénom'},
   {k:'nom',          l:'Nom'},
@@ -2778,6 +2875,11 @@ function deleteUser(id){
       </div>
     </div>
   </div>
+</div>
+
+<!-- AVIS POPUP -->
+<div id="avis-popup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1100;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.style.display='none'">
+  <div id="avis-popup-content" style="background:#fff;border-radius:8px;width:100%;max-width:580px;max-height:85vh;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--blue);overflow:hidden;display:flex;flex-direction:column"></div>
 </div>
 
 <!-- FOOTER -->
