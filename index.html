@@ -1965,11 +1965,12 @@ const UI_MAP = {
   'ville':'ville',
   'courriel':'email','email':'email',
   'rôle':'role','role':'role',
+  'entreprise':'entreprise','entreprises':'entreprise','entreprise (sans accès)':'entreprise',
   'mrc(s)':'mrcs','mrcs':'mrcs','mrc':'mrcs',
   'mot de passe (nouveau seulement)':'password',
   'mot de passe':'password','password':'password','mdp':'password',
 };
-const UI_VALID_ROLES = ['assembleur','distributeur','conseiller','administrateur'];
+const UI_VALID_ROLES = ['assembleur','distributeur','conseiller','administrateur','entreprise'];
 
 function uiBuildPreview(headers, rows){
   const colMap = headers.map(h => UI_MAP[h.toLowerCase().trim()] || null);
