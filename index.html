@@ -2116,6 +2116,29 @@ async function confirmUsersImport(){
 // ════════════════════════════════════════════════════════
 // GESTION UTILISATEURS (Firebase Auth + Firestore)
 // ════════════════════════════════════════════════════════
+function buildUserCard(u, vc, vb, rl){
+  const init=((u.prenom||'?')[0]+((u.nom||'?')[0])).toUpperCase();
+  const col=vc[u.role]||'#607d8b';
+  return '<div class="user-card '+(vb[u.role]||'')+'" style="'+(u.actif===false?'opacity:.6;border-left-color:#e5e7eb':'')+'">'
+    +'<div class="uc-head">'
+    +'<div class="uc-avatar" style="background:'+col+'">'+init+'</div>'
+    +'<div class="uc-info">'
+    +'<div class="uc-name">'+esc(u.prenom||'')+' '+esc(u.nom||'')+'</div>'
+    +'<div class="uc-co">'+esc(u.compagnie||'')+' — '+esc(u.ville||'')+'</div>'
+    +'<div class="uc-email">'+esc(u.email||'')+'</div>'
+    +((u.mrcs&&u.mrcs.length)?'<div class="uc-co">MRC : '+esc(u.mrcs.join(', '))+'</div>':'')
+    +'</div></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    +'<span class="uc-role" style="background:'+col+'18;color:'+col+';border:1px solid '+col+'33">'+(rl[u.role]||u.role)+'</span>'
+    +'<span style="padding:2px 9px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);letter-spacing:.4px;text-transform:uppercase;'+(u.actif===false?'background:#ffebee;color:#c62828;border:1px solid #fca5a5':'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7')+'">'+(u.actif===false?'Inactif':'Actif')+'</span>'
+    +'</div>'
+    +'<div class="uc-actions">'
+    +'<button class="btn btn-secondary btn-sm" data-edit="'+esc(u.id)+'">✎ Modifier</button>'
+    +(u.id!==session.id&&u.actif!==false?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':'')
+    +(u.actif===false&&u.id!==session.id?'<button class="btn btn-danger btn-sm" data-permadel="'+esc(u.id)+'" style="background:var(--err);color:#fff;border-color:var(--err)">🗑 Supprimer de la BD</button>':'')
+    +'</div></div>';
+}
+
 let usersFilter = 'actif'; // 'actif' | 'inactif' | 'tous' | 'entreprise'
 
 function renderUsers(){
@@ -2123,6 +2146,7 @@ function renderUsers(){
   const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller',entreprise:'r-entreprise'};
   const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller',entreprise:'Entreprise'};
   const roleOrder={administrateur:0,assembleur:1,distributeur:2,conseiller:3,entreprise:4};
+  const roleTitles={administrateur:'Administrateurs',assembleur:'Assembleurs',distributeur:'Distributeurs',conseiller:'Conseillers',entreprise:'Entreprises'};
 
   // Filter
   let filtered = allUsers.filter(u=>{
@@ -2139,30 +2163,33 @@ function renderUsers(){
     return (a.nom||'').localeCompare(b.nom||'','fr');
   });
 
-  const cards=filtered.map(u=>{
-    const init=((u.prenom||'?')[0]+((u.nom||'?')[0])).toUpperCase();
-    const col=vc[u.role]||'#607d8b';
-    return`<div class="user-card ${vb[u.role]||''}" style="${u.actif===false?'opacity:.6;border-left-color:#e5e7eb':''}">
-      <div class="uc-head">
-        <div class="uc-avatar" style="background:${col}">${init}</div>
-        <div class="uc-info">
-          <div class="uc-name">${esc(u.prenom||'')} ${esc(u.nom||'')}</div>
-          <div class="uc-co">${esc(u.compagnie||'')} — ${esc(u.ville||'')}</div>
-          <div class="uc-email">${esc(u.email||'')}</div>
-          ${(u.mrcs&&u.mrcs.length)?'<div class="uc-co">MRC : '+esc(u.mrcs.join(', '))+'</div>':''}
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span class="uc-role" style="background:${col}18;color:${col};border:1px solid ${col}33">${rl[u.role]||u.role}</span>
-        <span style="padding:2px 9px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);letter-spacing:.4px;text-transform:uppercase;${u.actif===false?'background:#ffebee;color:#c62828;border:1px solid #fca5a5':'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7'}">${u.actif===false?'Inactif':'Actif'}</span>
-      </div>
-      <div class="uc-actions">
-        <button class="btn btn-secondary btn-sm" data-edit="${esc(u.id)}">✎ Modifier</button>
-        ${u.id!==session.id&&u.actif!==false?'<button class="btn btn-danger btn-sm" data-del="'+esc(u.id)+'">🗑 Supprimer</button>':''}
-        ${u.actif===false&&u.id!==session.id?'<button class="btn btn-danger btn-sm" data-permadel="'+esc(u.id)+'" style="background:var(--err);color:#fff;border-color:var(--err)">🗑 Supprimer de la BD</button>':''}
-      </div>
-    </div>`;
-  }).join('');
+  // Build cards — grouped by role for 'actif' tab, flat for others
+  let cardsHtml = '';
+  if(usersFilter==='actif'){
+    const groups={};
+    filtered.forEach(u=>{
+      const r=u.role||'autre';
+      if(!groups[r]) groups[r]=[];
+      groups[r].push(u);
+    });
+    const roleKeys=Object.keys(groups).sort((a,b)=>(roleOrder[a]??9)-(roleOrder[b]??9));
+    roleKeys.forEach(role=>{
+      const col=vc[role]||'#607d8b';
+      const count=groups[role].length;
+      cardsHtml+=
+        '<div style="grid-column:1/-1;display:flex;align-items:center;gap:12px;margin:8px 0 4px">'
+        +'<div style="width:4px;height:22px;border-radius:2px;background:'+col+'"></div>'
+        +'<span style="font-family:var(--cond);font-size:14px;font-weight:700;color:'+col+'">'+( roleTitles[role]||role)+'</span>'
+        +'<span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:'+col+'18;color:'+col+'">'+count+'</span>'
+        +'<div style="flex:1;height:1px;background:var(--mist)"></div>'
+        +'</div>';
+      cardsHtml+=groups[role].map(u=>buildUserCard(u,vc,vb,rl)).join('');
+    });
+  } else {
+    cardsHtml=filtered.map(u=>buildUserCard(u,vc,vb,rl)).join('');
+  }
+
+  const cards=cardsHtml;
 
   const actifCount      = allUsers.filter(u=>u.actif!==false && u.role!=='entreprise').length;
   const inactifCount    = allUsers.filter(u=>u.actif===false  && u.role!=='entreprise').length;
