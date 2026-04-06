@@ -944,7 +944,7 @@ function startListeners(){
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
 
     // AvisInstal listener
-    const aiQuery = FB.query(FB.collection(FB.db,'AvisInstal'), FB.orderBy('date_installation','desc'));
+    const aiQuery = FB.collection(FB.db,'AvisInstal');
     window._unsubAvisInstal = FB.onSnapshot(aiQuery, snap=>{
       window.allAvisInstal=[];
       snap.forEach(d=>window.allAvisInstal.push({id:d.id,...d.data()}));
@@ -1782,18 +1782,19 @@ function renderAvisInstal(){
   const rows=getAvisRows();
   const thHtml=AI_COLS.map(c=>{
     const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';
-    return`<th class="${cls}" onclick="aiSort('${c.k}')">${esc(c.l)}</th>`;
+    const label=c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return'<th class="'+cls+'" onclick="aiSort(\''+c.k+'\')">'+label+'</th>';
   }).join('');
-  const rowsHtml=rows.length?rows.map(r=>`<tr>${AI_COLS.map(c=>{
+  const rowsHtml=rows.length?rows.map(r=>'<tr>'+AI_COLS.map(c=>{
     const v=r[c.k];
-    if(c.t==='bool') return`<td style="text-align:center">${v?'✅':'—'}</td>`;
+    if(c.t==='bool') return'<td style="text-align:center">'+(v?'✅':'—')+'</td>';
     if(c.t==='multi'){
       const vals=Array.isArray(v)?v:(v?[v]:[]);
-      return`<td>${vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—'}</td>`;
+      return'<td>'+(vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—')+'</td>';
     }
-    return`<td>${esc(v||'—')}</td>`;
-  }).join('')}</tr>`).join('')
-    :`<tr><td colspan="${AI_COLS.length}" style="text-align:center;padding:40px;color:var(--slate)">Aucun avis d'installation trouvé</td></tr>`;
+    return'<td>'+esc(v||'—')+'</td>';
+  }).join('')+'</tr>').join('')
+    :'<tr><td colspan="'+AI_COLS.length+'" style="text-align:center;padding:40px;color:var(--slate)">Aucun avis d\'installation trouvé</td></tr>';
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
