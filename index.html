@@ -1987,6 +1987,11 @@ function uiBuildPreview(headers, rows){
     const dup = allUsers.find(u => (u.email||'').toLowerCase() === rec.email.toLowerCase());
     if(dup) return { rec, row:i+2, status:'dup', reason:'Courriel déjà existant — doublon bloqué' };
 
+    // Entreprise : pas de compte Auth, mot de passe non requis
+    if(rec.role === 'entreprise'){
+      return { rec, row:i+2, status:'ok', reason:'' };
+    }
+
     if(!rec.password || rec.password.length < 6)
       return { rec, row:i+2, status:'err', reason:'Mot de passe manquant ou < 6 caractères' };
 
@@ -2058,8 +2063,10 @@ async function confirmUsersImport(){
   btn.disabled = true; btn.textContent = 'Import en cours…';
   setSyncing(true);
   let added=0, errors=0;
+  const total = validRows.length;
   const FB_API_KEY = 'AIzaSyDPq8u5bO_8yACQromO5Vzgy5g_E6xrads';
   for(const item of validRows){
+    btn.textContent = 'Import en cours… ('+( added+errors+1)+'/'+total+')';
     const pass = item.rec.password;
     const rec  = {...item.rec};
     delete rec.password;
@@ -2067,20 +2074,28 @@ async function confirmUsersImport(){
     rec.updatedAt = FB.serverTimestamp();
     rec.createdAt = FB.serverTimestamp();
     try{
-      const resp = await fetch(
-        'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY,
-        { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({email:rec.email, password:pass, returnSecureToken:false}) }
-      );
-      const data = await resp.json();
-      if(data.error){ errors++; toast('⚠ '+rec.email+' : '+data.error.message,'err'); continue; }
-      await FB.setDoc(FB.doc(FB.db,'users', data.localId), rec, {merge:true});
-      added++;
+      if(rec.role === 'entreprise'){
+        // Pas de compte Firebase Auth — écriture directe Firestore avec ID auto
+        await FB.addDoc(FB.collection(FB.db,'users'), rec);
+        added++;
+      } else {
+        const resp = await fetch(
+          'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB_API_KEY,
+          { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({email:rec.email, password:pass, returnSecureToken:false}) }
+        );
+        const data = await resp.json();
+        if(data.error){ errors++; toast('⚠ '+rec.email+' : '+data.error.message,'err'); continue; }
+        await FB.setDoc(FB.doc(FB.db,'users', data.localId), rec, {merge:true});
+        added++;
+        // Délai pour éviter le rate limit Firebase Auth
+        await new Promise(r => setTimeout(r, 800));
+      }
     } catch(e){ errors++; console.error(e); }
   }
   setSyncing(false);
   closeUsersImport();
-  toast('Import terminé — '+added+' compte'+(added>1?'s':'')+' créé'+(added>1?'s':'')+(errors?', '+errors+' erreur'+(errors>1?'s':''):''));
+  toast('Import terminé — '+added+' entrée'+(added>1?'s':'')+' créée'+(added>1?'s':'')+(errors?', '+errors+' erreur'+(errors>1?'s':''):''));
 }
 
 // ════════════════════════════════════════════════════════
