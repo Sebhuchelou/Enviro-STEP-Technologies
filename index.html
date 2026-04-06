@@ -1825,6 +1825,7 @@ let aiSearch='', aiSortKey='', aiSortDir='asc';
 
 const AI_COLS=[
   {k:'no_serie_hk',              l:'N° Série HK'},
+  {k:'assembleur_attribue',      l:'Assembleur attribué'},
   {k:'date_installation',         l:"Date d'installation prévue"},
   {k:'no_civique_rue',            l:'Numéro civique, rue (site)'},
   {k:'ville_site',                l:'Ville (site)'},
@@ -2115,12 +2116,29 @@ function deleteSelectedAvis(){
   });
 }
 
+async function saveAvisField(id, key, value){
+  setSyncing(true);
+  try{
+    await FB.updateDoc(FB.doc(FB.db,'AvisInstal',id),{[key]:value, updatedAt:FB.serverTimestamp()});
+    toast('Assembleur attribué ✓');
+  }catch(e){toast('Erreur: '+e.message,'err')}
+  setSyncing(false);
+}
+
 function renderAvisInstal(){
   const rows=getAvisRows();
+  // Liste des assembleurs actifs pour le dropdown
+  const assembleurs=(allUsers||[]).filter(u=>u.role==='assembleur'&&u.actif!==false).map(u=>u.compagnie||u.nom||'').filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+
   const rowsHtml=rows.length?rows.map(r=>{
     const chk='<td style="padding:9px 8px;text-align:center"><input type="checkbox" class="avis-row-chk" data-id="'+r.id+'" '+(selectedAvis.has(r.id)?'checked':'')+' onchange="toggleAvisSelect(\''+r.id+'\')" style="cursor:pointer;width:15px;height:15px"/></td>';
     const cells=AI_COLS.map(c=>{
       const v=r[c.k];
+      // Colonne assembleur attribué — dropdown inline
+      if(c.k==='assembleur_attribue'){
+        const opts='<option value="">— Non attribué —</option>'+assembleurs.map(a=>'<option value="'+esc(a)+'"'+(v===a?' selected':'')+'>'+esc(a)+'</option>').join('');
+        return'<td style="background:#fef3c7;min-width:160px"><select onchange="saveAvisField(\''+r.id+'\',\'assembleur_attribue\',this.value)" style="width:100%;padding:4px 6px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">'+opts+'</select></td>';
+      }
       if(c.t==='bool') return'<td style="text-align:center">'+(v?'✅':'—')+'</td>';
       if(c.t==='multi'){
         const vals=Array.isArray(v)?v:(v?[v]:[]);
@@ -2170,7 +2188,7 @@ function renderAvisInstal(){
         <button onclick="selectedAvis.clear();renderAvisInstal()" style="padding:6px 14px;border-radius:3px;background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.7);font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">✕ Désélectionner</button>
       </div>
       <div class="tbl-scroll">
-        <table><thead><tr><th style="width:36px;padding:10px 8px"><input type="checkbox" id="avis-chk-all" onclick="toggleSelectAllAvis(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>${AI_COLS.map(c=>{const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';return`<th class="${cls}" onclick="aiSort('${c.k}')">${esc(c.l)}</th>`;}).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>
+        <table><thead><tr><th style="width:36px;padding:10px 8px"><input type="checkbox" id="avis-chk-all" onclick="toggleSelectAllAvis(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>${AI_COLS.map(c=>{const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';const style=c.k==='assembleur_attribue'?'style="background:#b45309;color:#fff"':'';return`<th class="${cls}" ${style} onclick="aiSort('${c.k}')">${esc(c.l)}</th>`;}).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
     </div>`;
 }
