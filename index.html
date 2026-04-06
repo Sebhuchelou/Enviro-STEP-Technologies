@@ -223,9 +223,9 @@ input,select,textarea{font-family:inherit}
 
 /* ── TABLE ───────────────────────────────────── */
 .tbl-card{background:white;border:1px solid var(--mist);border-radius:6px;overflow:hidden;box-shadow:var(--sh)}
-.tbl-scroll{overflow-x:auto;max-height:calc(100vh - 310px)}
+.tbl-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 310px)}
 table{width:100%;border-collapse:collapse;font-size:.82rem}
-thead th{padding:10px 13px;text-align:left;background:var(--charcoal);font-family:var(--cond);font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;cursor:pointer;transition:color var(--tr);border-right:1px solid rgba(255,255,255,.06)}
+thead th{padding:10px 13px;text-align:left;background:var(--charcoal);font-family:var(--cond);font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;cursor:pointer;transition:color var(--tr);border-right:1px solid rgba(255,255,255,.06);position:sticky;top:0;z-index:10}
 thead th:last-child{border-right:none}
 thead th:hover{color:white}
 thead th.s-asc::after{content:' ↑';color:var(--green)}
@@ -965,6 +965,7 @@ function switchPanel(name,btn){
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   asmView=null;
+  asmLivreFilter=null;
   currentPanel=name; selectedRows.clear(); selectedAvis.clear(); renderPanel();
 }
 function renderPanel(){
@@ -977,24 +978,23 @@ function renderPanel(){
 // ════════════════════════════════════════════════════════
 // DASHBOARD ASSEMBLEUR
 // ════════════════════════════════════════════════════════
-let asmView = null; // null = dashboard, 'stock'|'avis'|'livre'
+let asmView = null;
+let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 
 function renderDashboard(){
   if(asmView) { renderTableauFiltered(); return; }
   const rows = getRows();
   const stock  = rows.filter(r=>r.statut==='Fabriqué');
   const avis   = rows.filter(r=>r.statut==="Avis d'installation");
+  const avisMe = avis.filter(r=>(r.assembleur_attribue||'')===(session.compagnie||''));
   const livre  = rows.filter(r=>r.statut==='Livré vers distributeur'||r.statut==='Livré vers entreprise');
 
-  // ── Helper: groupe par produit_principal ─────────────────
   function byProduit(list){
     const map={};
     list.forEach(r=>{const p=r.produit_principal||'Non défini';map[p]=(map[p]||0)+1;});
     return Object.entries(map).sort((a,b)=>b[1]-a[1]);
   }
-
-  // ── Barres horizontales ──────────────────────────────────
-  function barsHtml(entries, color){
+  function barsHtml(entries,color){
     if(!entries.length) return '<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucune donnée</div>';
     const max=entries[0][1];
     return entries.map(([prod,cnt])=>`
@@ -1009,43 +1009,34 @@ function renderDashboard(){
       </div>`).join('');
   }
 
-  // ── Stats livraisons ─────────────────────────────────────
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  function parseDate(s){
-    if(!s) return null;
-    const d=new Date(s);
-    return isNaN(d)?null:d;
-  }
-  const livreMois = livre.filter(r=>{
-    const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);
-    return d&&d.getFullYear()===y&&d.getMonth()===m;
-  });
-  const livreAnnee = livre.filter(r=>{
-    const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);
-    return d&&d.getFullYear()===y;
-  });
-  const sixMoisAgo = new Date(now); sixMoisAgo.setMonth(sixMoisAgo.getMonth()-6);
-  const livreS6 = livre.filter(r=>{
-    const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);
-    return d&&d>=sixMoisAgo;
-  });
-  const plusAn = livre.filter(r=>{
-    const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);
-    const cutoff=new Date(now); cutoff.setFullYear(cutoff.getFullYear()-1);
-    return d&&d<cutoff;
-  });
-
+  // Stats livraisons
+  const now=new Date(); const y=now.getFullYear(), m=now.getMonth();
+  function parseDate(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
+  const livreMois  = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d.getFullYear()===y&&d.getMonth()===m;});
+  const livreAnnee = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d.getFullYear()===y;});
+  const sixMoisAgo=new Date(now);sixMoisAgo.setMonth(sixMoisAgo.getMonth()-6);
+  const livreS6    = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d>=sixMoisAgo;});
+  const plusAn     = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);const c=new Date(now);c.setFullYear(c.getFullYear()-1);return d&&d<c;});
   const nomMois=now.toLocaleDateString('fr-CA',{month:'long',year:'numeric'});
 
-  const statBox=(label,val,color)=>`
-    <div style="background:${color}10;border:1px solid ${color}30;border-radius:6px;padding:14px 16px;text-align:center">
+  // Stat box cliquable pour livrés
+  const statBox=(label,val,color,filter)=>`
+    <div onclick="asmView='livre';asmLivreFilter='${filter}';renderDashboard()" style="background:${color}10;border:1px solid ${color}30;border-radius:6px;padding:14px 16px;text-align:center;cursor:pointer;transition:transform .15s" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform=''">
       <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:${color}">${val}</div>
       <div style="font-size:.75rem;color:var(--slate);margin-top:2px;line-height:1.3">${label}</div>
     </div>`;
 
-  const prodStock = byProduit(stock);
-  const prodAvis  = byProduit(avis);
+  const prodStock=byProduit(stock);
+  const prodAvis=byProduit(avis);
+
+  // Liste des avis attribués à cet assembleur
+  const avisRows=avisMe.length?avisMe.slice(0,8).map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+      <span style="font-family:var(--cond);font-size:.78rem;font-weight:700;color:var(--blue);min-width:100px">${esc(r.no_serie_hk||'—')}</span>
+      <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.nom_client||'')} ${esc(r.ville_livraison||r.ville_site||'')}</span>
+      <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600">${esc(r.produit_principal||'—')}</span>
+    </div>`).join('')+(avisMe.length>8?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-8} autre${avisMe.length-8>1?'s':''}</div>`:'')
+    :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis attribué</div>';
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
@@ -1054,67 +1045,89 @@ function renderDashboard(){
         <div class="page-sub">${rows.length} enregistrement${rows.length!==1?'s':''} au total</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;padding:4px 0">
+
+    <!-- RANGÉE 1 : Stock + Avis globaux (50/50) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
 
       <!-- CARTE 1 : STOCK -->
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
-        <div style="padding:20px 22px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:1rem;font-weight:700;color:var(--charcoal)">🔧 Stock — Fabriqués</div>
-            <div style="font-size:.78rem;color:var(--slate);margin-top:2px">Prêts à être livrés</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🔧 Stock — Fabriqués</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Prêts à être livrés</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.4rem;font-weight:800;color:var(--green)">${stock.length}</div>
+          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green)">${stock.length}</div>
         </div>
-        <div style="padding:16px 22px 8px">
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:12px">Par produit principal</div>
+        <div style="padding:14px 20px 8px">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Par produit principal</div>
           ${barsHtml(prodStock,'var(--green)')}
         </div>
-        <div style="padding:10px 22px 16px">
-          <button onclick="asmView='stock';renderDashboard()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:.78rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+        <div style="padding:8px 20px 14px">
+          <button onclick="asmView='stock';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
 
-      <!-- CARTE 2 : AVIS D'INSTALLATION -->
+      <!-- CARTE 2 : AVIS GLOBAUX -->
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--blue);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
-        <div style="padding:20px 22px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:1rem;font-weight:700;color:var(--charcoal)">📋 Avis d'installation</div>
-            <div style="font-size:.78rem;color:var(--slate);margin-top:2px">Associés à une demande</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Avis d'installation</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Tous statuts Avis</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.4rem;font-weight:800;color:var(--blue)">${avis.length}</div>
+          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--blue)">${avis.length}</div>
         </div>
-        <div style="padding:16px 22px 8px">
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:12px">Par produit principal</div>
+        <div style="padding:14px 20px 8px">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Par produit principal</div>
           ${barsHtml(prodAvis,'var(--blue)')}
         </div>
-        <div style="padding:10px 22px 16px">
-          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid var(--blue);background:transparent;color:var(--blue);font-family:var(--cond);font-size:.78rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+        <div style="padding:8px 20px 14px">
+          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--blue);background:transparent;color:var(--blue);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
+    </div>
 
-      <!-- CARTE 3 : LIVRÉS -->
-      <div style="background:#fff;border-radius:8px;border-left:5px solid #7c3aed;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
-        <div style="padding:20px 22px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+    <!-- RANGÉE 2 : Mes avis attribués (1/4) + Livrés (3/4) -->
+    <div style="display:grid;grid-template-columns:1fr 3fr;gap:16px">
+
+      <!-- CARTE 3 : MES AVIS ATTRIBUÉS -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:1rem;font-weight:700;color:var(--charcoal)">🚚 Livrés</div>
-            <div style="font-size:.78rem;color:var(--slate);margin-top:2px">Vers distributeur ou entreprise</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📌 Mes avis attribués</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Assignés à ${esc(session.compagnie||'')}</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.4rem;font-weight:800;color:#7c3aed">${livre.length}</div>
+          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#0891b2">${avisMe.length}</div>
         </div>
-        <div style="padding:16px 22px 8px">
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:12px">Répartition temporelle</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            ${statBox('Mois en cours<br><small style="color:var(--silver)">${nomMois}</small>',livreMois.length,'#7c3aed')}
-            ${statBox('Année en cours<br><small style="color:var(--silver)">${y}</small>',livreAnnee.length,'#5b21b6')}
-            ${statBox('6 derniers mois',livreS6.length,'#8b5cf6')}
-            ${statBox('Plus de 12 mois',plusAn.length,'#a78bfa')}
-          </div>
+        <div style="padding:14px 20px 8px;max-height:260px;overflow-y:auto">
+          ${avisRows}
         </div>
-        <div style="padding:10px 22px 16px">
-          <button onclick="asmView='livre';renderDashboard()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid #7c3aed;background:transparent;color:#7c3aed;font-family:var(--cond);font-size:.78rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+        <div style="padding:8px 20px 14px">
+          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid #0891b2;background:transparent;color:#0891b2;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
 
+      <!-- CARTE 4 : LIVRÉS -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #7c3aed;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🚚 Livrés</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Vers distributeur ou entreprise</div>
+          </div>
+          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#7c3aed">${livre.length}</div>
+        </div>
+        <div style="padding:14px 20px 8px">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Cliquez sur une période pour filtrer</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            ${statBox('Mois en cours<br><small style="color:var(--silver)">${nomMois}</small>',livreMois.length,'#7c3aed','mois')}
+            ${statBox('Année en cours<br><small style="color:var(--silver)">${y}</small>',livreAnnee.length,'#5b21b6','annee')}
+            ${statBox('6 derniers mois',livreS6.length,'#8b5cf6','6mois')}
+            ${statBox('+12 mois',plusAn.length,'#a78bfa','plus12')}
+          </div>
+        </div>
+        <div style="padding:8px 20px 14px">
+          <button onclick="asmView='livre';asmLivreFilter=null;renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid #7c3aed;background:transparent;color:#7c3aed;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir tout le tableau →</button>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -1131,8 +1144,30 @@ function renderTableauFiltered(){
   };
   const colorMap={stock:'var(--green)',avis:'var(--blue)',livre:'#7c3aed'};
   const statuts=statutMap[asmView]||[];
-  const cols=getRows();
-  const rows=cols.filter(r=>statuts.includes(r.statut));
+  const allRowsForView=getRows().filter(r=>statuts.includes(r.statut));
+
+  // Filtre temporel pour livrés
+  let rows=allRowsForView;
+  let filtreLabel='';
+  if(asmView==='livre'&&asmLivreFilter){
+    const now=new Date(); const y=now.getFullYear(), mo=now.getMonth();
+    function pd(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
+    if(asmLivreFilter==='mois'){
+      rows=allRowsForView.filter(r=>{const d=pd(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d.getFullYear()===y&&d.getMonth()===mo;});
+      filtreLabel=' — Mois en cours';
+    } else if(asmLivreFilter==='annee'){
+      rows=allRowsForView.filter(r=>{const d=pd(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d.getFullYear()===y;});
+      filtreLabel=' — Année en cours';
+    } else if(asmLivreFilter==='6mois'){
+      const s=new Date(now);s.setMonth(s.getMonth()-6);
+      rows=allRowsForView.filter(r=>{const d=pd(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d>=s;});
+      filtreLabel=' — 6 derniers mois';
+    } else if(asmLivreFilter==='plus12'){
+      const c=new Date(now);c.setFullYear(c.getFullYear()-1);
+      rows=allRowsForView.filter(r=>{const d=pd(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d<c;});
+      filtreLabel=' — Plus de 12 mois';
+    }
+  }
   const allCols=getCols();
 
   const tblRows=rows.length
@@ -1161,7 +1196,7 @@ function renderTableauFiltered(){
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
         </button>
         <div>
-          <div class="page-title">${titleMap[asmView]}</div>
+          <div class="page-title">${titleMap[asmView]}${filtreLabel}</div>
           <div class="page-sub" style="color:${colorMap[asmView]}">${rows.length} enregistrement${rows.length!==1?'s':''}</div>
         </div>
       </div>
