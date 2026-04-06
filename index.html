@@ -1556,10 +1556,15 @@ const AI_COLS=[
   {k:'nom_entreprise_install',    l:'Entreprise installateur'},
   {k:'courriel_installateur',     l:'Courriel installateur'},
   {k:'tel_installateur',          l:'Téléphone installateur'},
+  {k:'atteste_licence',           l:"Par la présente j'atteste posséder une telle licence", t:'bool'},
   {k:'produit_principal',         l:'Produit principal'},
   {k:'produit2',                  l:'Produit #2'},
   {k:'produit3',                  l:'Produit #3'},
   {k:'distributeur_hk',          l:'Distributeur HYDRO-KINETIC'},
+  {k:'longueur_fils_hk',         l:'Longueur des fils Hydro-Kinetic', t:'multi', opts:["Kit standard 40'","Kit 90' (extra $)","Kit 140' (extra $)"]},
+  {k:'extensions_conduites',     l:'Extensions de conduites internes pour installations profondes', t:'multi', opts:["Aucune (hauteur des cheminées inférieures ou égales à 18'')","Kit d'extension (hauteur des cheminées comprises entre 24'' et 30'') - Note : si des rallonges de cheminées sont requises, commandez-les à votre distributeur."]},
+  {k:'rallonges_cheminees',      l:'Rallonges de cheminées supplémentaires', t:'multi', opts:["N/A","Rallonges de 6''","Rallonges de 12''"]},
+  {k:'autres_produits',          l:'Autres produits à commander'},
   {k:'firme_technologue',         l:'Firme technologue/ingénieur'},
   {k:'prenom_completeur',         l:'Prénom (complété par)'},
   {k:'nom_completeur',            l:'Nom (complété par)'},
@@ -1664,6 +1669,12 @@ AI_IMPORT_MAP['produit principal']='produit_principal';
 AI_IMPORT_MAP['produit #2']='produit2';
 AI_IMPORT_MAP['produit #3']='produit3';
 AI_IMPORT_MAP['distributeur hydro-kinetic']='distributeur_hk';
+AI_IMPORT_MAP['longueur des fils hydro-kinetic']='longueur_fils_hk';
+AI_IMPORT_MAP['extensions de conduites internes pour installations profondes']='extensions_conduites';
+AI_IMPORT_MAP['rallonges de cheminées supplémentaires']='rallonges_cheminees';
+AI_IMPORT_MAP['autres produits à commander']='autres_produits';
+AI_IMPORT_MAP["par la présente j'atteste posséder une telle licence"]='atteste_licence';
+AI_IMPORT_MAP['atteste licence']='atteste_licence';
 AI_IMPORT_MAP['firme technologue/ingénieur']='firme_technologue';
 AI_IMPORT_MAP['prénom (complété par)']='prenom_completeur';
 AI_IMPORT_MAP['nom (complété par)']='nom_completeur';
@@ -1773,7 +1784,15 @@ function renderAvisInstal(){
     const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';
     return`<th class="${cls}" onclick="aiSort('${c.k}')">${esc(c.l)}</th>`;
   }).join('');
-  const rowsHtml=rows.length?rows.map(r=>`<tr>${AI_COLS.map(c=>`<td>${esc(r[c.k]||'—')}</td>`).join('')}</tr>`).join('')
+  const rowsHtml=rows.length?rows.map(r=>`<tr>${AI_COLS.map(c=>{
+    const v=r[c.k];
+    if(c.t==='bool') return`<td style="text-align:center">${v?'✅':'—'}</td>`;
+    if(c.t==='multi'){
+      const vals=Array.isArray(v)?v:(v?[v]:[]);
+      return`<td>${vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—'}</td>`;
+    }
+    return`<td>${esc(v||'—')}</td>`;
+  }).join('')}</tr>`).join('')
     :`<tr><td colspan="${AI_COLS.length}" style="text-align:center;padding:40px;color:var(--slate)">Aucun avis d'installation trouvé</td></tr>`;
 
   document.getElementById('app-main').innerHTML=`
