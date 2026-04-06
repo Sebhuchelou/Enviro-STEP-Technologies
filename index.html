@@ -1539,6 +1539,7 @@ async function confirmImport(){
 let aiSearch='', aiSortKey='', aiSortDir='asc';
 
 const AI_COLS=[
+  {k:'no_serie_hk',              l:'N° Série HK'},
   {k:'date_installation',         l:"Date d'installation prévue"},
   {k:'no_civique_rue',            l:'Numéro civique, rue (site)'},
   {k:'ville_site',                l:'Ville (site)'},
@@ -1637,6 +1638,10 @@ let aiImportParsed=[];
 const AI_IMPORT_MAP={};
 AI_COLS.forEach(c=>{ AI_IMPORT_MAP[c.l.toLowerCase().trim()]=c.k; });
 // Extra aliases
+AI_IMPORT_MAP['n° série hk']='no_serie_hk';
+AI_IMPORT_MAP['no série hk']='no_serie_hk';
+AI_IMPORT_MAP['numéro de série hk']='no_serie_hk';
+AI_IMPORT_MAP['no_serie_hk']='no_serie_hk';
 AI_IMPORT_MAP["date d'installation prévue"]='date_installation';
 AI_IMPORT_MAP['date installation']='date_installation';
 AI_IMPORT_MAP['numéro civique, rue (site)']='no_civique_rue';
