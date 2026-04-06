@@ -857,7 +857,7 @@ async function doLogin(){
       spinner.style.display='none'; btn.disabled=false; return;
     }
 
-    session={...userDoc, uid: cred.user.uid, id: cred.user.uid, mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
+    session={...userDoc, uid: cred.user.uid, id: cred.user.uid, email: userDoc.email||cred.user.email||'', mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
     closeLogin();
     document.getElementById('home-page').style.display='none';
     document.getElementById('app').style.display='flex';
@@ -1516,7 +1516,7 @@ async function confirmImport(){
   for(const r of importParsed){
     const rec={...r};
     delete rec._isUpdate;delete rec._dbId;
-    rec.derniere_modif=nowStr();rec.dernier_utilisateur=session.email;
+    rec.derniere_modif=nowStr();rec.dernier_utilisateur=session.email||session.nom||'';
     rec.updatedAt=FB.serverTimestamp();
     try{
       if(r._isUpdate&&r._dbId){
