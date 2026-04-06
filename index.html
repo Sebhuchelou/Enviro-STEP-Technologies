@@ -2227,6 +2227,8 @@ function renderUsers(){
 
 function showUserForm(mode,id){userFormMode=mode;userFormId=id||null;renderUsers();renderUserForm();setTimeout(()=>{const a=document.getElementById('uform-area');if(a)a.scrollIntoView({behavior:'smooth',block:'start'})},50)}
 
+function editUser(id){showUserForm('edit',id)}
+
 function renderUserForm(){
   const area=document.getElementById('uform-area');if(!area||!userFormMode)return;
   const u=userFormMode==='edit'?allUsers.find(x=>x.id===userFormId):null;
