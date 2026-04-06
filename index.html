@@ -1223,7 +1223,7 @@ async function saveRow(id){
     const data={...editBuf};
     delete data.id;
     data.derniere_modif=nowStr();
-    data.dernier_utilisateur=session.email;
+    data.dernier_utilisateur=session.email||session.nom||'';
     data.updatedAt=FB.serverTimestamp();
     await FB.updateDoc(FB.doc(FB.db,'records',id), data);
     editingId=null;editBuf={};
@@ -1248,7 +1248,7 @@ async function addRow(){
   const newHK='HK-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-4);
   const nr={
     po_assembleur:'', po_norweco:'',
-    nom_assembleur: session.role==='assembleur'?session.compagnie:'',
+    nom_assembleur: session.role==='assembleur'?(session.compagnie||''):'',
     recu_le: nowStr(),
     no_serie_hk: newHK,
     produit_principal:'', produit2:'', produit3:'',
@@ -1260,10 +1260,10 @@ async function addRow(){
     date_livraison_dist:'',
     adresse_site:'', ville_livraison:'',
     notes_assembleur:'', notes_distributeur:'',
-    assembleur_dist: session.role==='assembleur'?session.compagnie:session.role==='distributeur'?session.compagnie:'',
+    assembleur_dist: session.role==='assembleur'?(session.compagnie||''):session.role==='distributeur'?(session.compagnie||''):'',
     identification_site:'',
-    statut:"Fabriqué",
-    derniere_modif: nowStr(), dernier_utilisateur: session.email,
+    statut:'Fabriqué',
+    derniere_modif: nowStr(), dernier_utilisateur: session.email||session.nom||'',
     createdAt: FB.serverTimestamp(), updatedAt: FB.serverTimestamp()
   };
   setSyncing(true);
