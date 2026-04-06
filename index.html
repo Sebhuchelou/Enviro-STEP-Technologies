@@ -956,7 +956,7 @@ function startListeners(){
 function switchPanel(name,btn){
   document.querySelectorAll('.nav-link').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  currentPanel=name; selectedRows.clear(); renderPanel();
+  currentPanel=name; selectedRows.clear(); selectedAvis.clear(); renderPanel();
 }
 function renderPanel(){
   if(currentPanel==='tableau')renderTableau();
@@ -1846,23 +1846,80 @@ async function confirmAvisImport(){
   toast(`Import terminé — ${added} avis ajouté${added!==1?'s':''}${errors?', '+errors+' erreur(s)':''}`);
 }
 
+let selectedAvis = new Set();
+
+function toggleAvisSelect(id){
+  if(selectedAvis.has(id)) selectedAvis.delete(id); else selectedAvis.add(id);
+  updateAvisSelectionBar();
+}
+function toggleSelectAllAvis(checked){
+  const rows=getAvisRows();
+  const hasPartial=selectedAvis.size>0&&selectedAvis.size<rows.length;
+  const selectAll=checked||hasPartial;
+  if(selectAll) rows.forEach(r=>selectedAvis.add(r.id)); else selectedAvis.clear();
+  document.querySelectorAll('.avis-row-chk').forEach(cb=>{
+    cb.checked=selectedAvis.has(cb.dataset.id);
+    const tr=cb.closest('tr');
+    if(tr) tr.style.background=selectedAvis.has(cb.dataset.id)?'#fff3cd':'';
+  });
+  updateAvisSelectionBar();
+}
+function updateAvisSelectionBar(){
+  const bar=document.getElementById('avis-sel-bar');
+  const count=selectedAvis.size;
+  if(!bar)return;
+  if(count>0){
+    bar.style.display='flex';
+    document.getElementById('avis-sel-count').textContent=count+' avis sélectionné'+(count>1?'s':'');
+  } else {
+    bar.style.display='none';
+  }
+  document.querySelectorAll('.avis-row-chk').forEach(cb=>{ cb.checked=selectedAvis.has(cb.dataset.id); });
+  const allChk=document.getElementById('avis-chk-all');
+  if(allChk){
+    const rows=getAvisRows();
+    allChk.checked=rows.length>0&&rows.every(r=>selectedAvis.has(r.id));
+    allChk.indeterminate=count>0&&!allChk.checked;
+  }
+}
+function deleteSelectedAvis(){
+  const count=selectedAvis.size;
+  if(!count)return;
+  confirm2(`Supprimer définitivement ${count} avis d'installation de Firestore ?\nCette action est irréversible.`,async()=>{
+    setSyncing(true);
+    let deleted=0,errors=0;
+    for(const id of [...selectedAvis]){
+      try{ await FB.deleteDoc(FB.doc(FB.db,'AvisInstal',id)); deleted++; }
+      catch(e){ errors++; console.error(e); }
+    }
+    selectedAvis.clear();
+    setSyncing(false);
+    toast(deleted+' avis supprimé'+(deleted>1?'s':'')+(errors?', '+errors+' erreur(s)':''),'warn');
+  });
+}
+
 function renderAvisInstal(){
   const rows=getAvisRows();
-  const thHtml=AI_COLS.map(c=>{
+  const thHtml='<th style="width:36px;padding:10px 8px"><input type="checkbox" id="avis-chk-all" onclick="toggleSelectAllAvis(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>'
+    +AI_COLS.map(c=>{
     const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';
     const label=c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     return'<th class="'+cls+'" onclick="aiSort(\''+c.k+'\')">'+label+'</th>';
   }).join('');
-  const rowsHtml=rows.length?rows.map(r=>'<tr>'+AI_COLS.map(c=>{
-    const v=r[c.k];
-    if(c.t==='bool') return'<td style="text-align:center">'+(v?'✅':'—')+'</td>';
-    if(c.t==='multi'){
-      const vals=Array.isArray(v)?v:(v?[v]:[]);
-      return'<td>'+(vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—')+'</td>';
-    }
-    return'<td>'+esc(v||'—')+'</td>';
-  }).join('')+'</tr>').join('')
-    :'<tr><td colspan="'+AI_COLS.length+'" style="text-align:center;padding:40px;color:var(--slate)">Aucun avis d\'installation trouvé</td></tr>';
+  const rowsHtml=rows.length?rows.map(r=>{
+    const chk='<td style="padding:9px 8px;text-align:center"><input type="checkbox" class="avis-row-chk" data-id="'+r.id+'" '+(selectedAvis.has(r.id)?'checked':'')+' onchange="toggleAvisSelect(\''+r.id+'\')" style="cursor:pointer;width:15px;height:15px"/></td>';
+    const cells=AI_COLS.map(c=>{
+      const v=r[c.k];
+      if(c.t==='bool') return'<td style="text-align:center">'+(v?'✅':'—')+'</td>';
+      if(c.t==='multi'){
+        const vals=Array.isArray(v)?v:(v?[v]:[]);
+        return'<td>'+(vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—')+'</td>';
+      }
+      return'<td>'+esc(v||'—')+'</td>';
+    }).join('');
+    return'<tr style="'+(selectedAvis.has(r.id)?'background:#fff3cd':'')+'">'+chk+cells+'</tr>';
+  }).join('')
+    :'<tr><td colspan="'+(AI_COLS.length+1)+'" style="text-align:center;padding:40px;color:var(--slate)">Aucun avis d\'installation trouvé</td></tr>';
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
@@ -1894,6 +1951,13 @@ function renderAvisInstal(){
       <span class="result-info" style="margin-left:auto"><strong>${rows.length}</strong> résultat${rows.length!==1?'s':''}</span>
     </div>
     <div class="tbl-card">
+      <div id="avis-sel-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:#1f2937;border-radius:6px 6px 0 0;border-bottom:2px solid var(--err)">
+        <span id="avis-sel-count" style="font-family:var(--cond);font-size:13px;font-weight:700;color:#fff"></span>
+        <button onclick="deleteSelectedAvis()" style="padding:6px 14px;border-radius:3px;background:var(--err);border:none;color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#fff"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Supprimer la sélection
+        </button>
+        <button onclick="selectedAvis.clear();renderAvisInstal()" style="padding:6px 14px;border-radius:3px;background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.7);font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">✕ Désélectionner</button>
+      </div>
       <div class="tbl-scroll">
         <table><thead><tr>${thHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
