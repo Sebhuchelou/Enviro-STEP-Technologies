@@ -464,6 +464,7 @@ tbody tr:hover{background:#f8fbf5;}
 .users-grid{gap:12px;}.user-card{border-left:3px solid var(--mist);}
 .user-card.r-admin{border-left-color:#374151}.user-card.r-assembleur{border-left-color:var(--green)}.user-card.r-distributeur{border-left-color:var(--blue)}
 .user-card.r-conseiller{border-left-color:#7c3aed}
+.user-card.r-entreprise{border-left-color:#b45309}
 .overlay{background:rgba(0,0,0,.45);backdrop-filter:none;}
 .modal{border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:400px;overflow:hidden;border-top:4px solid var(--green);padding:0;background:#fff;}
 .modal.border-blue{border-top-color:var(--blue)} .modal.border-dark{border-top-color:var(--charcoal)}
@@ -2084,18 +2085,20 @@ async function confirmUsersImport(){
 // ════════════════════════════════════════════════════════
 // GESTION UTILISATEURS (Firebase Auth + Firestore)
 // ════════════════════════════════════════════════════════
-let usersFilter = 'actif'; // 'actif' | 'inactif' | 'tous'
+let usersFilter = 'actif'; // 'actif' | 'inactif' | 'tous' | 'entreprise'
 
 function renderUsers(){
-  const vc={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#7c3aed'};
-  const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller'};
-  const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller'};
-  const roleOrder={administrateur:0,assembleur:1,distributeur:2,conseiller:3};
+  const vc={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#7c3aed',entreprise:'#b45309'};
+  const vb={administrateur:'r-admin',assembleur:'r-assembleur',distributeur:'r-distributeur',conseiller:'r-conseiller',entreprise:'r-entreprise'};
+  const rl={administrateur:'Administrateur',assembleur:'Assembleur',distributeur:'Distributeur',conseiller:'Conseiller',entreprise:'Entreprise'};
+  const roleOrder={administrateur:0,assembleur:1,distributeur:2,conseiller:3,entreprise:4};
 
   // Filter
   let filtered = allUsers.filter(u=>{
-    if(usersFilter==='actif')   return u.actif!==false;
-    if(usersFilter==='inactif') return u.actif===false;
+    if(usersFilter==='entreprise') return u.role==='entreprise';
+    if(usersFilter==='actif')      return u.actif!==false && u.role!=='entreprise';
+    if(usersFilter==='inactif')    return u.actif===false  && u.role!=='entreprise';
+    if(usersFilter==='tous')       return u.role!=='entreprise';
     return true;
   });
   // Sort by role then by name
@@ -2130,8 +2133,16 @@ function renderUsers(){
     </div>`;
   }).join('');
 
-  const actifCount   = allUsers.filter(u=>u.actif!==false).length;
-  const inactifCount = allUsers.filter(u=>u.actif===false).length;
+  const actifCount      = allUsers.filter(u=>u.actif!==false && u.role!=='entreprise').length;
+  const inactifCount    = allUsers.filter(u=>u.actif===false  && u.role!=='entreprise').length;
+  const tousCount       = allUsers.filter(u=>u.role!=='entreprise').length;
+  const entrepriseCount = allUsers.filter(u=>u.role==='entreprise').length;
+
+  const tabStyle = (active, color, bgActive) =>
+    'padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;'
+    +'border-bottom:3px solid '+(active?color:'transparent')+';color:'+(active?color:'var(--slate)');
+  const pillStyle = (active, color, bg) =>
+    'padding:2px 7px;border-radius:12px;font-size:11px;background:'+(active?bg:'var(--mist)')+';color:'+(active?color:'var(--slate)');
 
   const main=document.getElementById('app-main');
   main.innerHTML=
@@ -2141,11 +2152,12 @@ function renderUsers(){
     +'</div>'
     +'<div class="page-actions" id="users-page-actions"></div>'
     +'</div>'
-    // Filter tabs
-    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh)">'
-    +'<button id="uf-tab-actif"   onclick="usersFilter=\'actif\';renderUsers()"   style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='actif'?'var(--green)':'transparent')+';color:'+(usersFilter==='actif'?'var(--green-dark)':'var(--slate)')+';margin-bottom:-2px">Actifs <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='actif'?'var(--green-pale)':'var(--mist)')+';color:'+(usersFilter==='actif'?'var(--green-dark)':'var(--slate)')+'">'+actifCount+'</span></button>'
-    +'<button id="uf-tab-inactif" onclick="usersFilter=\'inactif\';renderUsers()" style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='inactif'?'var(--err)':'transparent')+';color:'+(usersFilter==='inactif'?'var(--err)':'var(--slate)')+';margin-bottom:-2px">Inactifs <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='inactif'?'var(--err-l)':'var(--mist)')+';color:'+(usersFilter==='inactif'?'var(--err)':'var(--slate)')+'">'+inactifCount+'</span></button>'
-    +'<button id="uf-tab-tous"    onclick="usersFilter=\'tous\';renderUsers()"    style="padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid '+(usersFilter==='tous'?'var(--blue)':'transparent')+';color:'+(usersFilter==='tous'?'var(--blue)':'var(--slate)')+';margin-bottom:-2px">Tous <span style="padding:2px 7px;border-radius:12px;font-size:11px;background:'+(usersFilter==='tous'?'var(--blue-pale)':'var(--mist)')+';color:'+(usersFilter==='tous'?'var(--blue)':'var(--slate)')+'">'+allUsers.length+'</span></button>'
+    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh);flex-wrap:wrap">'
+    +'<button onclick="usersFilter=\'actif\';renderUsers()"      style="'+tabStyle(usersFilter==='actif',   'var(--green-dark)','')+'">Actifs <span style="'+pillStyle(usersFilter==='actif','var(--green-dark)','var(--green-pale)')+'">'+actifCount+'</span></button>'
+    +'<button onclick="usersFilter=\'inactif\';renderUsers()"    style="'+tabStyle(usersFilter==='inactif', 'var(--err)',       '')+'">Inactifs <span style="'+pillStyle(usersFilter==='inactif','var(--err)','var(--err-l)')+'">'+inactifCount+'</span></button>'
+    +'<button onclick="usersFilter=\'tous\';renderUsers()"       style="'+tabStyle(usersFilter==='tous',    'var(--blue)',      '')+'">Tous <span style="'+pillStyle(usersFilter==='tous','var(--blue)','var(--blue-pale)')+'">'+tousCount+'</span></button>'
+    +'<div style="width:1px;background:var(--mist);margin:8px 6px;align-self:stretch"></div>'
+    +'<button onclick="usersFilter=\'entreprise\';renderUsers()" style="'+tabStyle(usersFilter==='entreprise','#b45309','')+'">🏢 Entreprises <span style="'+pillStyle(usersFilter==='entreprise','#b45309','#fef3c7')+'">'+entrepriseCount+'</span></button>'
     +'</div>'
     +'<div id="uform-area"></div>'
     +'<div class="users-grid">'+(cards||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>')+'</div>';
@@ -2204,6 +2216,7 @@ function renderUserForm(){
             <option value="distributeur"${u&&u.role==='distributeur'?' selected':''}>Distributeur</option>
             <option value="conseiller"${u&&u.role==='conseiller'?' selected':''}>Conseiller</option>
             <option value="administrateur"${u&&u.role==='administrateur'?' selected':''}>Administrateur</option>
+            <option value="entreprise"${u&&u.role==='entreprise'?' selected':''}>Entreprise (sans accès)</option>
           </select>
         </div>
         <div class="form-group full"><label>MRC(s)</label><input id="uf-mrcs" value="${u&&Array.isArray(u.mrcs)?esc(u.mrcs.join(', ')):''}" placeholder="Ex. Bellechasse, Montmagny, L'Islet"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Pour un conseiller, séparez les MRC par des virgules.</small></div>
