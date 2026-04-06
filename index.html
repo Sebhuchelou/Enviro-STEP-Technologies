@@ -914,13 +914,18 @@ function setupApp(){
         <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Avis d'installation
       </button>`;
   } else {
-    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('dashboard',this)">
-      <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Mes assemblages
+    const navLabel = session.role==='assembleur' ? 'Mes assemblages' : session.role==='distributeur' ? 'Mes livraisons' : 'Mon tableau';
+    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${session.role==='assembleur'?'dashboard':'tableau'}',this)">
+      <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>${navLabel}
     </button>`;
   }
 
   currentPanel = session.role==='assembleur' ? 'dashboard' : 'tableau';
   startListeners();
+  // Force immediate render for assembleur even before snapshot arrives
+  if(session.role==='assembleur'){
+    renderDashboard();
+  }
 }
 
 function startListeners(){
