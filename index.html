@@ -1064,7 +1064,7 @@ function getCols(){
 }
 function getRows(){
   let rows=[...allRecords];
-  if(session.role==='assembleur')rows=rows.filter(r=>r.nom_assembleur===session.compagnie||r.assembleur_dist===session.compagnie);
+  if(session.role==='assembleur')rows=rows.filter(r=>r.nom_assembleur===session.compagnie);
   else if(session.role==='distributeur'){
     rows=rows.filter(r=>r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie);
     if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab||r.assembleur_dist===activeAsmTab);
