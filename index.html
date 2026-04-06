@@ -1262,6 +1262,8 @@ function deleteSelected(){
     toast(`${deleted} ligne${deleted>1?'s':''} supprimée${deleted>1?'s':''}${errors?', '+errors+' erreur(s)':''}  ✓`,'warn');
   });
 }
+
+function startEdit(id){
   const row=allRecords.find(r=>r.id===id);if(!row)return;
   editBuf={...row};editingId=id;renderTableau();
   setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})},50);
