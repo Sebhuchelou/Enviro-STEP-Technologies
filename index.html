@@ -1137,12 +1137,15 @@ function renderTableauFiltered(){
 
   const tblRows=rows.length
     ?rows.map(r=>{
-      const base=rowHtml(r,allCols);
-      // Inject Avis button as first cell after removing last </tr>
-      const avisBtn = asmView==='avis'
-        ? `<td style="padding:6px 8px;white-space:nowrap"><button onclick="openAvisPopup('${esc(r.no_serie_hk||'')}',event)" style="padding:5px 11px;border-radius:3px;background:var(--blue);border:none;color:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#fff"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Avis</button></td>`
-        : '';
-      return base.replace('<tr ', '<tr ').replace('</tr>', avisBtn+'</tr>');
+      if(asmView==='avis'){
+        const hk=r.no_serie_hk||'';
+        const avisBtn=`<td style="padding:6px 8px;white-space:nowrap"><button onclick="openAvisPopup('${hk.replace(/'/g,"\\'")}',event)" style="padding:5px 11px;border-radius:3px;background:var(--blue);border:none;color:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#fff"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Avis</button></td>`;
+        // Build row manually: id + row HTML with avis button prepended before actions
+        const base=rowHtml(r,allCols);
+        // Insert avisBtn cell right after opening <tr...>
+        return base.replace(/(<tr[^>]*>)/, '$1'+avisBtn);
+      }
+      return rowHtml(r,allCols);
     }).join('')
     :`<tr><td colspan="${allCols.length+(asmView==='avis'?2:1)}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
 
