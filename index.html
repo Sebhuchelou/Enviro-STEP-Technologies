@@ -1900,12 +1900,6 @@ function deleteSelectedAvis(){
 
 function renderAvisInstal(){
   const rows=getAvisRows();
-  const thHtml='<th style="width:36px;padding:10px 8px"><input type="checkbox" id="avis-chk-all" onclick="toggleSelectAllAvis(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>'
-    +AI_COLS.map(c=>{
-    const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';
-    const label=c.l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    return'<th class="'+cls+'" onclick="aiSort(\''+c.k+'\')">'+label+'</th>';
-  }).join('');
   const rowsHtml=rows.length?rows.map(r=>{
     const chk='<td style="padding:9px 8px;text-align:center"><input type="checkbox" class="avis-row-chk" data-id="'+r.id+'" '+(selectedAvis.has(r.id)?'checked':'')+' onchange="toggleAvisSelect(\''+r.id+'\')" style="cursor:pointer;width:15px;height:15px"/></td>';
     const cells=AI_COLS.map(c=>{
@@ -1959,7 +1953,7 @@ function renderAvisInstal(){
         <button onclick="selectedAvis.clear();renderAvisInstal()" style="padding:6px 14px;border-radius:3px;background:transparent;border:1px solid rgba(255,255,255,.3);color:rgba(255,255,255,.7);font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">✕ Désélectionner</button>
       </div>
       <div class="tbl-scroll">
-        <table><thead><tr>${thHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
+        <table><thead><tr><th style="width:36px;padding:10px 8px"><input type="checkbox" id="avis-chk-all" onclick="toggleSelectAllAvis(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>${AI_COLS.map(c=>{const cls=aiSortKey===c.k?(aiSortDir==='asc'?' s-asc':' s-desc'):'';return`<th class="${cls}" onclick="aiSort('${c.k}')">${esc(c.l)}</th>`;}).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
     </div>`;
 }
