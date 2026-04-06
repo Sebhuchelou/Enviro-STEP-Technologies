@@ -1176,7 +1176,7 @@ function renderTableau(){
       <div class="tbl-scroll">
         <table>
           <thead><tr>
-            ${isAdmin?`<th style="width:36px;padding:10px 8px"><input type="checkbox" id="chk-all" onchange="toggleSelectAll(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>`:''}
+            ${isAdmin?`<th style="width:36px;padding:10px 8px"><input type="checkbox" id="chk-all" onclick="toggleSelectAll(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>`:''}
             ${cols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
             <th>Actions</th>
           </tr></thead>
@@ -1221,8 +1221,17 @@ function toggleRowSelect(id){
 }
 function toggleSelectAll(checked){
   const rows=getRows();
-  if(checked) rows.forEach(r=>selectedRows.add(r.id)); else selectedRows.clear();
-  renderTableau();
+  // Si état indéterminé ou déjà partiellement sélectionné → tout sélectionner
+  const hasPartial = selectedRows.size > 0 && selectedRows.size < rows.length;
+  const selectAll = checked || hasPartial;
+  if(selectAll) rows.forEach(r=>selectedRows.add(r.id)); else selectedRows.clear();
+  // Update row highlights and checkboxes without full re-render
+  document.querySelectorAll('.row-chk').forEach(cb=>{
+    cb.checked=selectedRows.has(cb.dataset.id);
+    const tr=cb.closest('tr');
+    if(tr) tr.style.background=selectedRows.has(cb.dataset.id)?'#fff3cd':'';
+  });
+  updateSelectionBar();
 }
 function updateSelectionBar(){
   const bar=document.getElementById('sel-bar');
