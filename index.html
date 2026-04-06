@@ -1725,9 +1725,9 @@ function parseCSVImport(text){
 
 function parseXLSXImport(buffer){
   function run(){
-    const wb=XLSX.read(buffer,{type:'array'});
+    const wb=XLSX.read(buffer,{type:'array',cellDates:true,cellNF:false,cellText:false});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd'});
     if(data.length<2){toast('Fichier vide','err');return}
     buildImportPreview(data[0].map(String),data.slice(1).map(r=>r.map(String)));
   }
@@ -1991,9 +1991,9 @@ function parseAvisCSVImport(text){
 
 function parseAvisXLSXImport(buffer){
   loadXLSX(()=>{
-    const wb=XLSX.read(buffer,{type:'array'});
+    const wb=XLSX.read(buffer,{type:'array',cellDates:true,cellNF:false,cellText:false});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd'});
     if(data.length<2){toast('Fichier vide','err');return}
     buildAvisImportPreview(data[0].map(String),data.slice(1).map(r=>r.map(String)));
   });
@@ -2300,9 +2300,9 @@ function uiParseCSV(text){
 
 function uiParseXLSX(buf){
   loadXLSX(()=>{
-    const wb = XLSX.read(buf,{type:'array'});
+    const wb = XLSX.read(buf,{type:'array',cellDates:true,cellNF:false,cellText:false});
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const data = XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd'});
     if(data.length < 2){ toast('Fichier vide','err'); return; }
     uiBuildPreview(data[0].map(String), data.slice(1).map(r=>r.map(String)));
   });
