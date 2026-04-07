@@ -1571,11 +1571,12 @@ function loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois){
   const container=document.getElementById('cons-map-container');
   if(!container)return;
 
-  // Préparer les données — installations 12 derniers mois avec coordonnées via geocoding
+  // Préparer les données — installations 12 derniers mois avec ville_site
   const installs12 = myAvis.filter(r=>{
-    if(!r.no_serie_hk) return false;
+    if(!r.ville_site) return false;
     const d=r.createdAt?.toDate?r.createdAt.toDate():(r.createdAt?new Date(r.createdAt):null);
-    return d&&d>=il12mois;
+    if(!d||isNaN(d)) return true; // pas de date → inclure quand même
+    return d>=il12mois;
   });
 
   // On utilise Leaflet (CDN libre) + OpenStreetMap
@@ -1605,55 +1606,67 @@ async function initMap(container,installs,assembleurs,distributeurs){
     className:'',iconAnchor:[size/2,size/2]
   });
 
-  // Geocoder une adresse via Nominatim (rate-limit friendly : 1 req/sec)
+  // Cache géocodage global (persiste entre re-renders)
+  if(!window._geocache) window._geocache={};
+
   async function geocode(query){
+    const key=query.toLowerCase().trim();
+    if(window._geocache[key]) return window._geocache[key];
     try{
-      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`,{headers:{'Accept-Language':'fr'}});
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`,{headers:{'Accept-Language':'fr','User-Agent':'HKTracker/1.0'}});
       const d=await r.json();
-      if(d&&d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon),label:d[0].display_name};
+      if(d&&d[0]){
+        const pos={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
+        window._geocache[key]=pos;
+        return pos;
+      }
     }catch(e){}
     return null;
   }
 
-  // Installations — geocoder par ville_site
+  // Installations — essayer adresse complète d'abord, puis ville seule
   const villesDone={};
-  for(const inst of installs.slice(0,30)){
-    const ville=inst.ville_site||inst.no_civique_rue||'';
+  for(const inst of installs.slice(0,40)){
+    const adresse=inst.no_civique_rue?`${inst.no_civique_rue}, ${inst.ville_site||''}`:(inst.ville_site||'');
+    const ville=inst.ville_site||'';
     if(!ville) continue;
-    const key=ville.toLowerCase().trim();
-    if(!villesDone[key]){
-      const pos=await geocode(ville+', Québec, Canada');
-      if(pos){
-        villesDone[key]=pos;
-        await new Promise(r=>setTimeout(r,1100));
-      }
-    }
-    if(villesDone[key]){
-      window.L.marker([villesDone[key].lat,villesDone[key].lng],{icon:mkIcon('#1b5fa8',12)})
+
+    // Essayer adresse complète, fallback sur ville
+    let pos = adresse.length>ville.length ? await geocode(adresse+', Québec, Canada') : null;
+    if(!pos) pos = villesDone[ville.toLowerCase()] || await geocode(ville+', Québec, Canada');
+
+    if(pos){
+      villesDone[ville.toLowerCase()]=pos;
+      // Décaler légèrement si même ville pour éviter superposition
+      const jitter=(Math.random()-0.5)*0.01;
+      window.L.marker([pos.lat+jitter,pos.lng+jitter],{icon:mkIcon('#1b5fa8',12)})
         .addTo(map)
-        .bindPopup(`<b>${esc(inst.nom_entreprise_install||inst.nom_entrepreneur||'Installation')}</b><br>${esc(ville)}`);
+        .bindPopup(`<b>${esc(inst.nom_entreprise_install||inst.nom_entrepreneur||'Installation')}</b><br>${esc(adresse)}`);
+      await new Promise(r=>setTimeout(r,1200));
     }
   }
 
   // Assembleurs — par ville
   for(const u of assembleurs){
-    const pos=await geocode((u.ville||'')+', Québec, Canada');
+    if(!u.ville) continue;
+    const pos=await geocode((u.ville)+', Québec, Canada');
     if(pos){
-      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('var(--green)',14)})
+      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('#669c43',16)})
         .addTo(map)
-        .bindPopup(`<b>🔧 ${esc(u.compagnie||u.nom||'')}</b><br>Assembleur — ${esc(u.ville||'')}`);
-      await new Promise(r=>setTimeout(r,1100));
+        .bindPopup(`<b>🔧 ${esc(u.compagnie||u.nom||'')}</b><br>Assembleur — ${esc(u.ville)}`);
+      await new Promise(r=>setTimeout(r,1200));
     }
   }
 
   // Distributeurs — par ville
   for(const u of distributeurs){
-    const pos=await geocode((u.ville||'')+', Québec, Canada');
+    if(!u.ville) continue;
+    const pos=await geocode((u.ville)+', Québec, Canada');
     if(pos){
-      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('#7c3aed',14)})
+      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('#7c3aed',16)})
         .addTo(map)
-        .bindPopup(`<b>🚚 ${esc(u.compagnie||u.nom||'')}</b><br>Distributeur — ${esc(u.ville||'')}`);
-      await new Promise(r=>setTimeout(r,1100));
+        .bindPopup(`<b>🚚 ${esc(u.compagnie||u.nom||'')}</b><br>Distributeur — ${esc(u.ville)}`);
+      await new Promise(r=>setTimeout(r,1200));
     }
   }
 }
