@@ -1022,7 +1022,7 @@ let asmView = null;
 let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 
 function renderDashboard(){
-  if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre') { renderTableauFiltered(); return; }
+  if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard') { renderTableauFiltered(); return; }
 
   const isDist = session.role==='distributeur';
   const allMyRows = allRecords.filter(r=>
@@ -1091,6 +1091,22 @@ function renderDashboard(){
   const prodStock=groupFn(stock);
   const prodAvis=groupFn(avis);
 
+  // ── KPI semaine / mois / retard ─────────────────────────
+  const kpiNow=new Date(); kpiNow.setHours(0,0,0,0);
+  const kpiEndWeek=new Date(kpiNow); kpiEndWeek.setDate(kpiNow.getDate()+(6-kpiNow.getDay()));
+  const kpiEndMonth=new Date(kpiNow.getFullYear(),kpiNow.getMonth()+1,0);
+  function kpiDate(r){
+    const d1=r.date_livraison?new Date(r.date_livraison+'T12:00:00'):null;
+    const d2=r.date_livraison_dist?new Date(r.date_livraison_dist+'T12:00:00'):null;
+    if(d1&&!isNaN(d1))return d1;
+    if(d2&&!isNaN(d2))return d2;
+    return null;
+  }
+  const kpiRows = allMyRows.filter(r=>r.statut==='Fabriqué'||r.statut==="Avis d'installation");
+  const kpiSemaine  = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d>=kpiNow&&d<=kpiEndWeek;});
+  const kpiMois     = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d>=kpiNow&&d<=kpiEndMonth;});
+  const kpiRetard   = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d<kpiNow;});
+
   const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>{
     const label = r.nom_entreprise_install || r.distributeur_hk || ((r.prenom_client||'')+' '+(r.nom_client||'')).trim() || '—';
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
@@ -1118,6 +1134,27 @@ function renderDashboard(){
         <div class="page-sub">${allMyRows.length} enregistrement${allMyRows.length!==1?'s':''} au total</div>
       </div>
     </div>
+
+    <!-- BANDE KPI -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+      <div onclick="asmView='semaine';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0891b2;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#0891b2">${kpiSemaine.length}</div>
+        <div><div style="font-size:.8rem;font-weight:700;color:var(--charcoal)">À livrer cette semaine</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">date_livraison ou dist ≤ fin de semaine</div></div>
+      </div>
+      <div onclick="asmView='mois_kpi';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0e7490;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#0e7490">${kpiMois.length}</div>
+        <div><div style="font-size:.8rem;font-weight:700;color:var(--charcoal)">À livrer ce mois-ci</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">date_livraison ou dist ≤ fin du mois</div></div>
+      </div>
+      <div onclick="asmView='retard';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #dc2626;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:#dc2626;flex-shrink:0"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#dc2626">${kpiRetard.length}</div>
+        </div>
+        <div><div style="font-size:.8rem;font-weight:700;color:#dc2626">En retard</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">Date passée — statut non livré</div></div>
+      </div>
+    </div>
+
+    <!-- RANGÉE 1 : Stock + Avis globaux (50/50) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
@@ -1125,7 +1162,7 @@ function renderDashboard(){
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">${cardStock1Title}</div>
             <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardStock1Sub}</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green)">${stock.length}</div>
+          <div onclick="asmView='stock';renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green);cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='var(--green-pale)'" onmouseout="this.style.background=''">${stock.length}</div>
         </div>
         <div style="padding:14px 20px 8px">
           <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
@@ -1141,7 +1178,7 @@ function renderDashboard(){
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Avis d'installation</div>
             <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardAvisSub}</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--blue)">${avis.length}</div>
+          <div onclick="asmView='avisWith';renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--blue);cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='var(--blue-pale)'" onmouseout="this.style.background=''">${avis.length}</div>
         </div>
         <div style="padding:14px 20px 8px">
           <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
@@ -1159,7 +1196,7 @@ function renderDashboard(){
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">${cardTraiterTitle}</div>
             <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardTraiterSub}</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:${cardTraiterColor}">${avisMe.length}</div>
+          <div onclick="asmView='avis';renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:${cardTraiterColor};cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background=''">${avisMe.length}</div>
         </div>
         <div style="padding:14px 20px 8px;max-height:260px;overflow-y:auto">${avisRows}</div>
         <div style="padding:8px 20px 14px">
@@ -1172,7 +1209,7 @@ function renderDashboard(){
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🚚 Livrés</div>
             <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Vers distributeur ou entreprise</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#7c3aed">${livre.length}</div>
+          <div onclick="asmView='livre';asmLivreFilter=null;renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#7c3aed;cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='#f3e8ff'" onmouseout="this.style.background=''">${livre.length}</div>
         </div>
         <div style="padding:14px 20px 8px">
           <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Cliquez sur une période pour filtrer</div>
@@ -1193,22 +1230,29 @@ function renderDashboard(){
 
 function renderTableauFiltered(){
   const statutMap={
-    stock: ['Fabriqué'],
-    avis:  ["Avis d'installation"],
-    livre: ['Livré vers distributeur','Livré vers entreprise'],
+    stock:     ['Fabriqué'],
+    avis:      ["Avis d'installation"],
+    livre:     ['Livré vers distributeur','Livré vers entreprise'],
+    semaine:   ['Fabriqué',"Avis d'installation"],
+    mois_kpi:  ['Fabriqué',"Avis d'installation"],
+    retard:    ['Fabriqué',"Avis d'installation"],
   };
   const titleMap={
-    stock: '🔧 Stock — Assemblages fabriqués',
-    avis:  "📋 Associés à un Avis d'installation",
-    livre: '🚚 Livrés',
+    stock:    '🔧 Stock — Assemblages fabriqués',
+    avis:     "📋 Associés à un Avis d'installation",
+    livre:    '🚚 Livrés',
+    semaine:  '📅 À livrer cette semaine',
+    mois_kpi: '📆 À livrer ce mois-ci',
+    retard:   '⚠ Livraisons en retard',
   };
-  const colorMap={stock:'var(--green)',avis:'var(--blue)',livre:'#7c3aed'};
+  const colorMap={stock:'var(--green)',avis:'var(--blue)',livre:'#7c3aed',semaine:'#0891b2',mois_kpi:'#0e7490',retard:'#dc2626'};
   const statuts=statutMap[asmView]||[];
   const allRowsForView=getRows().filter(r=>statuts.includes(r.statut));
 
   // Filtre temporel pour livrés
   let rows=allRowsForView;
   let filtreLabel='';
+
   if(asmView==='livre'&&asmLivreFilter){
     const now=new Date(); const y=now.getFullYear(), mo=now.getMonth();
     function pd(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
@@ -1226,6 +1270,22 @@ function renderTableauFiltered(){
       const c=new Date(now);c.setFullYear(c.getFullYear()-1);
       rows=allRowsForView.filter(r=>{const d=pd(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d<c;});
       filtreLabel=' — Plus de 12 mois';
+    }
+  }
+
+  // Filtres KPI
+  if(asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'){
+    const now=new Date(); now.setHours(0,0,0,0);
+    const endOfWeek=new Date(now); endOfWeek.setDate(now.getDate()+(6-now.getDay()));
+    const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
+    function pd2(s){if(!s)return null;const d=new Date(s+'T12:00:00');return isNaN(d)?null:d;}
+    function livDate(r){return pd2(r.date_livraison)||pd2(r.date_livraison_dist);}
+    if(asmView==='semaine'){
+      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfWeek;});
+    } else if(asmView==='mois_kpi'){
+      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfMonth;});
+    } else if(asmView==='retard'){
+      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d<now;});
     }
   }
   const allCols=getCols();
