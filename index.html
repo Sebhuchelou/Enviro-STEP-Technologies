@@ -1076,21 +1076,12 @@ function renderDashboard(){
   const prodStock=byProduit(stock);
   const prodAvis=byProduit(avis);
 
-  // Numéros de série disponibles (Fabriqué, pas encore associé à un avis)
-  const hkDispo = rows.filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort();
-
-  // Liste des avis attribués à cet assembleur
-  const avisRows=avisMe.length?avisMe.map(r=>`
-    <div style="padding:8px 0;border-bottom:1px solid var(--mist)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-        <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.prenom_client||'')+' '+(r.nom_client||''))}, ${esc(r.ville_site||'')}</span>
-        <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600;white-space:nowrap">${esc(r.produit_principal||'—')}</span>
-      </div>
-      <select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">
-        <option value="">— Attribuer N° série HK —</option>
-        ${hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('')}
-      </select>
-    </div>`).join('')+(avisMe.length>8?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-8} autre${avisMe.length-8>1?'s':''}</div>`:'')
+  // Liste des avis attribués à cet assembleur (card preview)
+  const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+      <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.prenom_client||'')+' '+(r.nom_client||''))}, ${esc(r.ville_site||'')}</span>
+      <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600;white-space:nowrap">${esc(r.produit_principal||'—')}</span>
+    </div>`).join('')+(avisMe.length>6?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-6} autre${avisMe.length-6>1?'s':''}</div>`:'')
     :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis à traiter</div>';
 
   document.getElementById('app-main').innerHTML=`
@@ -1225,24 +1216,50 @@ function renderTableauFiltered(){
   }
   const allCols=getCols();
 
-  const tblRows=rows.length
-    ?rows.map(r=>{
-      if(asmView==='avis'){
-        const hk=(r.no_serie_hk||'').replace(/'/g,"\\'");
-        const avisBtn=`<td style="padding:6px 8px;white-space:nowrap"><button onclick="openAvisPopup('${hk}',event)" style="padding:5px 11px;border-radius:3px;background:var(--blue);border:none;color:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#fff"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Avis</button></td>`;
-        const cells=allCols.map(c=>{
-          const v=r[c.k]??'';
-          if(c.k==='statut')return`<td>${badgeSt(v)}</td>`;
-          if(c.t==='date')return`<td style="white-space:nowrap">${fmtDate(v)}</td>`;
-          if(c.hk)return`<td class="hk">${esc(v)||'—'}</td>`;
-          return`<td>${esc(v)||'—'}</td>`;
-        }).join('');
-        const actions=`<td class="td-actions"><button class="row-btn edit-btn" onclick="startEdit('${r.id}')">✎</button></td>`;
-        return`<tr id="row-${r.id}">${avisBtn}${cells}${actions}</tr>`;
-      }
-      return rowHtml(r,allCols);
+  // Vue spéciale pour "Avis d'installation à traiter" — affiche AvisInstal sans N° HK
+  if(asmView==='avis'){
+    const allAvis = (window.allAvisInstal||[]).filter(r=>
+      (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
+    );
+    const hkDispo = getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort();
+
+    const avisColsLabels=['Client','Ville','Produit principal','Date installation','Installateur','Attribuer N° HK'];
+    const thAvis=avisColsLabels.map(l=>`<th>${l}</th>`).join('');
+    const trAvis=allAvis.length ? allAvis.map(r=>{
+      const opts='<option value="">— Choisir —</option>'+hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('');
+      return`<tr>
+        <td>${esc((r.prenom_client||'')+' '+(r.nom_client||''))}</td>
+        <td>${esc(r.ville_site||'—')}</td>
+        <td>${esc(r.produit_principal||'—')}</td>
+        <td style="white-space:nowrap">${esc(r.date_installation||'—')}</td>
+        <td>${esc(r.nom_entreprise_install||'—')}</td>
+        <td style="min-width:180px"><select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">${opts}</select></td>
+      </tr>`;
     }).join('')
-    :`<tr><td colspan="${allCols.length+(asmView==='avis'?2:1)}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2/.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
+    :`<tr><td colspan="6"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis à traiter</p></div></td></tr>`;
+
+    document.getElementById('app-main').innerHTML=`
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onclick="asmView=null;renderDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
+          </button>
+          <div>
+            <div class="page-title">📌 Avis d'installation à traiter</div>
+            <div class="page-sub" style="color:#0891b2">${allAvis.length} avis — N° de série à attribuer</div>
+          </div>
+        </div>
+      </div>
+      <div class="tbl-card">
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr>${thAvis}</tr></thead>
+            <tbody>${trAvis}</tbody>
+          </table>
+        </div>
+      </div>`;
+    return;
+  }
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
