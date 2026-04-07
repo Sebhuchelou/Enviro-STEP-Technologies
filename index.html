@@ -957,6 +957,7 @@ function startListeners(){
       snap.forEach(d=>window.allAvisInstal.push({id:d.id,...d.data()}));
       if(currentPanel==='avisInstal') renderAvisInstal();
       if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='tableau') renderTableau();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
   }
 
@@ -1880,6 +1881,7 @@ const COLS_ADMIN=[
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
   {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
+  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
   {k:'derniere_modif',       l:'Dernière modification', t:'date'},
   {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
 ];
@@ -2099,6 +2101,13 @@ function rowHtml(row,cols){
       return`<td><input type="text" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
     }
     if(c.k==='statut')return`<td>${badgeSt(v)}</td>`;
+    if(c.t==='avis_link'){
+      // Chercher l'avis associé par no_serie_hk
+      const hk=row.no_serie_hk||'';
+      const avis=(window.allAvisInstal||[]).find(a=>a.no_serie_hk===hk);
+      if(!hk||!avis) return`<td style="text-align:center;color:var(--silver)">—</td>`;
+      return`<td style="text-align:center"><button onclick="openAvisPopup('${hk.replace(/'/g,"\\'")}',event)" style="padding:4px 10px;border-radius:3px;background:var(--blue-pale);border:1px solid var(--blue);color:var(--blue);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Voir</button></td>`;
+    }
     if(c.t==='date')return`<td style="white-space:nowrap">${fmtDate(v)}</td>`;
     if(c.hk)return`<td class="hk">${esc(v)||'—'}</td>`;
     return`<td>${esc(v)||'—'}</td>`;
