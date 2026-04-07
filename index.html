@@ -989,6 +989,7 @@ function switchPanel(name,btn){
   if(btn)btn.classList.add('active');
   asmView=null;
   asmLivreFilter=null;
+  asmStockProdFilter=null;
   currentPanel=name; selectedRows.clear(); selectedAvis.clear(); renderPanel();
 }
 function renderPanel(){
@@ -1042,6 +1043,7 @@ async function assignHkToAvis(avisId, hk, selectEl){
 // ════════════════════════════════════════════════════════
 let asmView = null;
 let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
+let asmStockProdFilter = null; // filtre par produit_principal pour la vue stock
 
 function renderDashboard(){
   if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard') { renderTableauFiltered(); return; }
@@ -1082,11 +1084,13 @@ function renderDashboard(){
   const groupLabel = isDist ? 'Par assembleur' : 'Par produit principal';
   const barColor1  = isDist ? '#1b5fa8' : 'var(--green)';
 
-  function barsHtml(entries,color){
+  function barsHtml(entries,color,clickProduit=false){
     if(!entries.length) return '<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucune donnée</div>';
     const max=entries[0][1];
-    return entries.map(([prod,cnt])=>`
-      <div style="margin-bottom:10px">
+    return entries.map(([prod,cnt])=>{
+      const clickAttr=clickProduit?`onclick="asmView='stock';asmStockProdFilter='${prod.replace(/'/g,"\\'").replace(/"/g,'&quot;')}';renderDashboard()" style="cursor:pointer"`:'';
+      const hoverStyle=clickProduit?` onmouseover="this.style.background='${color}18'" onmouseout="this.style.background=''"`:''
+      return`<div ${clickAttr}${hoverStyle} style="margin-bottom:10px;padding:${clickProduit?'4px 6px':'0'};border-radius:4px;transition:background .15s">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
           <span style="font-size:.78rem;color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="${esc(prod)}">${esc(prod)}</span>
           <span style="font-family:var(--cond);font-size:.85rem;font-weight:700;color:${color};margin-left:8px">${cnt}</span>
@@ -1094,7 +1098,8 @@ function renderDashboard(){
         <div style="height:7px;border-radius:4px;background:var(--mist);overflow:hidden">
           <div style="height:100%;border-radius:4px;background:${color};width:${Math.round(cnt/max*100)}%;transition:width .4s ease"></div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   const now=new Date(); const y=now.getFullYear(), m=now.getMonth();
@@ -1226,7 +1231,7 @@ function renderDashboard(){
         </div>
         <div style="padding:14px 20px 8px">
           <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
-          ${barsHtml(prodStock,barColor1)}
+          ${barsHtml(prodStock,barColor1,true)}
         </div>
         <div style="padding:8px 20px 14px">
           <button onclick="asmView='stock';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
@@ -1814,11 +1819,29 @@ function openAttrStep2(){
   const overlay=document.getElementById('attr-overlay');
   const avis=(window.allAvisInstal||[]).find(r=>r.id===_attrAvisId);
   if(!avis) return;
+  _attrStatut='';
 
   const stockDispo = overlay._stock || allRecords.filter(r=>r.statut==='Fabriqué'&&r.nom_assembleur===session.compagnie);
 
+  // Liste des distributeurs depuis allUsers
+  const distUsers = (allUsers||[]).filter(u=>u.role==='distributeur'&&u.actif!==false);
+  const distOpts = distUsers.map(u=>`<option value="${esc(u.compagnie||u.nom||'')}">${esc(u.compagnie||u.nom||'')}</option>`).join('');
+
+  const initType = avis.type_client||'Entrepreneur direct';
+  const isDist = initType==='Distributeur';
+
+  const hkListHtml = stockDispo.length ? stockDispo.map(r=>`
+    <div id="hk-row-${r.id}" onclick="selectAttrHK('${r.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--mist);cursor:pointer;transition:background .1s">
+      <div id="hk-radio-${r.id}" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--green);background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>
+      <div>
+        <div style="font-family:var(--cond);font-size:.88rem;font-weight:700;color:var(--charcoal)">${esc(r.no_serie_hk||'—')}</div>
+        <div style="font-size:.72rem;color:var(--slate)">${esc(r.produit_principal||'—')}</div>
+      </div>
+    </div>`).join('')
+  : '<div style="padding:20px;text-align:center;color:var(--slate);font-size:.82rem">Aucun stock disponible</div>';
+
   overlay.innerHTML=`
-    <div style="background:#fff;border-radius:8px;width:100%;max-width:760px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--green)">
+    <div style="background:#fff;border-radius:8px;width:100%;max-width:800px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--green)">
       <div style="padding:20px 24px 14px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
         <div>
           <div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#222">Étape 2 — Sélectionner un N° HK et confirmer</div>
@@ -1831,78 +1854,97 @@ function openAttrStep2(){
         <!-- Colonne gauche : choisir le HK -->
         <div>
           <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">N° Série HK disponibles (${stockDispo.length})</div>
-          <div style="max-height:300px;overflow-y:auto;border:1px solid var(--mist);border-radius:6px">
-            ${stockDispo.length?stockDispo.map(r=>`
-              <div id="hk-row-${r.id}" onclick="selectAttrHK('${r.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--mist);cursor:pointer;transition:background .1s" onmouseover="if(_attrRecordId!=='${r.id}')this.style.background='var(--green-pale)'" onmouseout="if(_attrRecordId!=='${r.id}')this.style.background=''">
-                <div id="hk-radio-${r.id}" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--green);background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>
-                <div>
-                  <div style="font-family:var(--cond);font-size:.88rem;font-weight:700;color:var(--charcoal)">${esc(r.no_serie_hk||'—')}</div>
-                  <div style="font-size:.72rem;color:var(--slate)">${esc(r.produit_principal||'—')}</div>
-                </div>
-              </div>`).join('')
-            :'<div style="padding:20px;text-align:center;color:var(--slate);font-size:.82rem">Aucun stock disponible</div>'}
-          </div>
+          <div style="max-height:360px;overflow-y:auto;border:1px solid var(--mist);border-radius:6px">${hkListHtml}</div>
         </div>
 
         <!-- Colonne droite : champs modifiables -->
         <div>
           <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Informations à confirmer</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:9px">
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #2</label>
-              <input id="attr-produit2" value="${esc(avis.produit2||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-produit2" value="${esc(avis.produit2||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #3</label>
-              <input id="attr-produit3" value="${esc(avis.produit3||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-produit3" value="${esc(avis.produit3||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom de l'entrepreneur</label>
-              <input id="attr-entrepreneur" value="${esc(avis.nom_entreprise_install||avis.nom_entrepreneur||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-entrepreneur" value="${esc(avis.nom_entreprise_install||avis.nom_entrepreneur||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Date de livraison assembleur</label>
-              <input type="date" id="attr-date-livraison" value="${esc(avis.date_installation||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
-            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Type client</label>
-              <select id="attr-type-client" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px">
-                <option value="Entrepreneur direct"${(avis.type_client||'')==='Entrepreneur direct'?' selected':''}>Entrepreneur direct</option>
-                <option value="Distributeur"${(avis.type_client||'')==='Distributeur'?' selected':''}>Distributeur</option>
-              </select></div>
+              <input type="date" id="attr-date-livraison" value="${esc(avis.date_installation||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
+            <div>
+              <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Type client</label>
+              <select id="attr-type-client" onchange="attrToggleDistributeur(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box">
+                <option value="Entrepreneur direct"${initType==='Entrepreneur direct'?' selected':''}>Entrepreneur direct</option>
+                <option value="Distributeur"${initType==='Distributeur'?' selected':''}>Distributeur</option>
+              </select>
+            </div>
+
+            <div id="attr-dist-row" style="display:${isDist?'block':'none'}">
+              <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom du distributeur</label>
+              <select id="attr-nom-distributeur" style="width:100%;padding:6px 10px;border:1px solid #f59e0b;border-radius:var(--r);font-size:.83rem;margin-top:3px;background:#fffbeb;box-sizing:border-box">
+                <option value="">— Choisir un distributeur —</option>
+                ${distOpts}
+              </select>
+            </div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Adresse du site</label>
-              <input id="attr-adresse" value="${esc(avis.no_civique_rue||avis.adresse_site||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-adresse" value="${esc(avis.no_civique_rue||avis.adresse_site||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Ville</label>
-              <input id="attr-ville" value="${esc(avis.ville_site||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-ville" value="${esc(avis.ville_site||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Notes assembleur</label>
-              <input id="attr-notes" value="${esc(avis.note_distributeur||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+              <input id="attr-notes" value="${esc(avis.notes_assembleur||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+
             <div>
               <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Statut *</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
-                <button id="stat-dist" onclick="setAttrStatut('Livré vers distributeur')" style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🚚 Livré distributeur</button>
-                <button id="stat-ent"  onclick="setAttrStatut('Livré vers entreprise')"  style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🏢 Livré entreprise</button>
-                <button id="stat-ann"  onclick="setAttrStatut('Annulé')"                   style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;grid-column:1/-1;color:#dc2626">✕ Annuler</button>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+                <button id="stat-dist" onclick="setAttrStatut('Livré vers distributeur')" style="display:${isDist?'flex':'none'};padding:9px 12px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;align-items:center;gap:6px">🚚 Livré vers le distributeur</button>
+                <button id="stat-ent"  onclick="setAttrStatut('Livré vers entreprise')"  style="display:${!isDist?'flex':'none'};padding:9px 12px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;align-items:center;gap:6px">🏢 Livré vers l'entreprise</button>
               </div>
               <input type="hidden" id="attr-statut" value=""/>
             </div>
+
           </div>
         </div>
       </div>
-      <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:space-between;align-items:center">
         <button onclick="openAvisAttributionModal(null)" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">← Retour</button>
-        <div style="display:flex;gap:10px">
-          <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
-          <button id="attr-save-btn" onclick="confirmAttribution()" disabled style="padding:8px 20px;border-radius:var(--r);border:2px solid var(--green);background:var(--green);color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;opacity:.4">💾 Enregistrer</button>
-        </div>
+        <button id="attr-save-btn" onclick="confirmAttribution()" disabled style="padding:8px 20px;border-radius:var(--r);border:2px solid var(--green);background:var(--green);color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;opacity:.4">💾 Enregistrer</button>
       </div>
     </div>`;
+}
+
+function attrToggleDistributeur(typeClient){
+  const isDist = typeClient==='Distributeur';
+  const distRow = document.getElementById('attr-dist-row');
+  const btnDist = document.getElementById('stat-dist');
+  const btnEnt  = document.getElementById('stat-ent');
+  if(distRow) distRow.style.display = isDist ? 'block' : 'none';
+  if(btnDist) btnDist.style.display = isDist ? 'flex' : 'none';
+  if(btnEnt)  btnEnt.style.display  = isDist ? 'none' : 'flex';
+  // Reset statut si on change de type
+  _attrStatut='';
+  const inp=document.getElementById('attr-statut'); if(inp) inp.value='';
+  [btnDist,btnEnt].forEach(b=>{if(b){b.style.borderColor='var(--mist)';b.style.background='#fff';b.style.color='var(--charcoal)';}});
+  checkAttrSaveBtn();
 }
 
 let _attrStatut='';
 function setAttrStatut(s){
   _attrStatut=s;
-  const ids={dist:'Livré vers distributeur',ent:'Livré vers entreprise',ann:'Annulé'};
+  const ids={dist:'Livré vers distributeur',ent:'Livré vers entreprise'};
   Object.entries(ids).forEach(([sfx,val])=>{
     const btn=document.getElementById('stat-'+sfx);
     if(!btn)return;
     const active=val===s;
-    btn.style.borderColor=active?(sfx==='ann'?'#dc2626':'var(--green)'):'var(--mist)';
-    btn.style.background=active?(sfx==='ann'?'#fee2e2':'var(--green-pale)'):'#fff';
-    btn.style.color=active?(sfx==='ann'?'#dc2626':'var(--green-dark)'):'var(--charcoal)';
+    btn.style.borderColor=active?'var(--green)':'var(--mist)';
+    btn.style.background=active?'var(--green-pale)':'#fff';
+    btn.style.color=active?'var(--green-dark)':'var(--charcoal)';
   });
-  const input=document.getElementById('attr-statut');
-  if(input) input.value=s;
   checkAttrSaveBtn();
 }
 function selectAttrHK(id){
@@ -1938,6 +1980,7 @@ async function confirmAttribution(){
     const entrepreneur=document.getElementById('attr-entrepreneur')?.value||'';
     const dateLiv  =document.getElementById('attr-date-livraison')?.value||'';
     const typeClient=document.getElementById('attr-type-client')?.value||'';
+    const nomDist  =document.getElementById('attr-nom-distributeur')?.value||'';
     const adresse  =document.getElementById('attr-adresse')?.value||'';
     const ville    =document.getElementById('attr-ville')?.value||'';
     const notes    =document.getElementById('attr-notes')?.value||'';
@@ -1955,6 +1998,7 @@ async function confirmAttribution(){
       nom_installateur:   entrepreneur,
       date_livraison:     dateLiv,
       type_client:        typeClient,
+      nom_distributeur:   nomDist,
       adresse_site:       adresse,
       ville_livraison:    ville,
       notes_assembleur:   notes,
@@ -1992,7 +2036,7 @@ function renderTableauFiltered(){
     retard:    ['Fabriqué',"Avis d'installation"],
   };
   const titleMap={
-    stock:    '🔧 Stock — Assemblages fabriqués',
+    stock:    asmStockProdFilter ? `🔧 Stock — ${asmStockProdFilter}` : '🔧 Stock — Assemblages fabriqués',
     avis:     "📋 Associés à un Avis d'installation",
     livre:    '🚚 Livrés',
     semaine:  '📅 À livrer cette semaine',
@@ -2027,7 +2071,10 @@ function renderTableauFiltered(){
     }
   }
 
-  // Filtres KPI
+  // Filtre produit pour stock assembleur
+  if(asmView==='stock' && asmStockProdFilter){
+    rows=rows.filter(r=>(r.produit_principal||'')===asmStockProdFilter);
+  }
   if(asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'){
     const now=new Date(); now.setHours(0,0,0,0);
     const endOfWeek=new Date(now); endOfWeek.setDate(now.getDate()+(6-now.getDay()));
@@ -2211,6 +2258,7 @@ const COLS_ADMIN=[
   {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
 ];
 const COLS_ASM=[
+  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
   {k:'po_assembleur',        l:'#PO Assembleur', ro:true},
   {k:'po_norweco',           l:'#PO Norweco', ro:true},
   {k:'nom_assembleur',       l:'Nom de l\'Assembleur', ro:true},
