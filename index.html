@@ -3702,25 +3702,26 @@ async function confirmUsersImport(){
               await new Promise(r => setTimeout(r, 30000));
               continue;
             }
-            // EMAIL_EXISTS → récupérer l'UID existant et mettre à jour Firestore seulement
+            // EMAIL_EXISTS → chercher l'UID dans Firestore par courriel
             if(data.error.message === 'EMAIL_EXISTS'){
               try{
-                const lookupResp = await fetch(
-                  'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+FB_API_KEY,
-                  { method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({email:[rec.email]}) }
-                );
-                const lookupData = await lookupResp.json();
-                const uid = lookupData.users && lookupData.users[0] && lookupData.users[0].localId;
-                if(uid){
+                const q = await FB.getDocs(FB.query(FB.collection(FB.db,'users'), FB.where('email','==',rec.email)));
+                if(!q.empty){
+                  const uid = q.docs[0].id;
                   const updateRec = {...rec};
-                  delete updateRec.createdAt; // ne pas écraser createdAt existant
+                  delete updateRec.createdAt;
                   await FB.setDoc(FB.doc(FB.db,'users', uid), updateRec, {merge:true});
                   updated++;
                   authDone = true;
                 } else {
-                  errors++;
-                  toast('⚠ '+rec.email+' : compte introuvable après EMAIL_EXISTS','err');
+                  // Compte Firebase Auth existe mais pas dans Firestore — créer avec email comme clé temporaire
+                  const tmpId = rec.email.replace(/[^a-zA-Z0-9]/g,'_');
+                  const updateRec = {...rec};
+                  delete updateRec.createdAt;
+                  await FB.setDoc(FB.doc(FB.db,'users', tmpId), updateRec, {merge:true});
+                  updated++;
+                  authDone = true;
+                  toast('⚠ '+rec.email+' : profil recréé (UID temporaire)','warn');
                 }
               }catch(e2){
                 errors++;
