@@ -1823,9 +1823,17 @@ function openAttrStep2(){
 
   const stockDispo = overlay._stock || allRecords.filter(r=>r.statut==='Fabriqué'&&r.nom_assembleur===session.compagnie);
 
-  // Liste des distributeurs depuis allUsers
-  const distUsers = (allUsers||[]).filter(u=>u.role==='distributeur'&&u.actif!==false);
-  const distOpts = distUsers.map(u=>`<option value="${esc(u.compagnie||u.nom||'')}">${esc(u.compagnie||u.nom||'')}</option>`).join('');
+  // Liste des distributeurs associés à cet assembleur (assembleur_defaut, assembleur_2 ou assembleur_3)
+  const distUsers = (allUsers||[]).filter(u=>
+    u.role==='distributeur' && u.actif!==false && (
+      (u.assembleur_defaut||'')===(session.compagnie||'') ||
+      (u.assembleur_2||'')===(session.compagnie||'') ||
+      (u.assembleur_3||'')===(session.compagnie||'')
+    )
+  );
+  const distOpts = distUsers.length
+    ? distUsers.map(u=>`<option value="${esc(u.compagnie||u.nom||'')}">${esc(u.compagnie||u.nom||'')}</option>`).join('')
+    : (allUsers||[]).filter(u=>u.role==='distributeur'&&u.actif!==false).map(u=>`<option value="${esc(u.compagnie||u.nom||'')}">${esc(u.compagnie||u.nom||'')}</option>`).join('');
 
   const initType = avis.type_client||'Entrepreneur direct';
   const isDist = initType==='Distributeur';
@@ -3231,8 +3239,16 @@ function deleteSelectedAvis(){
 async function saveAvisField(id, key, value){
   setSyncing(true);
   try{
-    await FB.updateDoc(FB.doc(FB.db,'AvisInstal',id),{[key]:value, updatedAt:FB.serverTimestamp()});
-    toast('Assembleur attribué ✓');
+    const updateData={[key]:value, updatedAt:FB.serverTimestamp()};
+    // Si on change le distributeur_hk, auto-remplir assembleur_attribue avec l'assembleur_defaut du distributeur
+    if(key==='distributeur_hk' && value){
+      const distUser=(allUsers||[]).find(u=>u.role==='distributeur'&&u.actif!==false&&(u.compagnie||'')===(value||''));
+      if(distUser && distUser.assembleur_defaut){
+        updateData.assembleur_attribue = distUser.assembleur_defaut;
+      }
+    }
+    await FB.updateDoc(FB.doc(FB.db,'AvisInstal',id), updateData);
+    toast(key==='assembleur_attribue'?'Assembleur attribué ✓':'Mis à jour ✓');
   }catch(e){toast('Erreur: '+e.message,'err')}
   setSyncing(false);
 }
@@ -3385,25 +3401,30 @@ function openAvisPopup(noSerieHk, e){
       ${row('Autres produits', avis.autres_produits)}
 
       ${section('Complété par','✍️')}
-      ${row('Firme technologue/ingénieur', avis.firme_technologue)}
       ${row('Prénom', avis.prenom_completeur)}
       ${row('Nom', avis.nom_completeur)}
       ${row('Courriel', avis.courriel_completeur)}
       ${row('Note au distributeur', avis.note_distributeur)}
+
+      ${section('Autres informations','ℹ️')}
+      ${row('Firme technologue/ingénieur', avis.firme_technologue)}
     </div>`;
 
   overlay.style.display='flex';
 }
 
 const USER_COLS=[
-  {k:'prenom',       l:'Prénom'},
-  {k:'nom',          l:'Nom'},
-  {k:'compagnie',    l:'Compagnie'},
-  {k:'ville',        l:'Ville'},
-  {k:'email',        l:'Courriel'},
-  {k:'role',         l:'Rôle'},
-  {k:'mrcs',         l:'MRC(s)'},
-  {k:'mot_de_passe', l:'Mot de passe (nouveau seulement)', exportSkip:true},
+  {k:'prenom',              l:'Prénom'},
+  {k:'nom',                 l:'Nom'},
+  {k:'compagnie',           l:'Compagnie'},
+  {k:'ville',               l:'Ville'},
+  {k:'email',               l:'Courriel'},
+  {k:'role',                l:'Rôle'},
+  {k:'mrcs',                l:'MRC(s)'},
+  {k:'assembleur_defaut',   l:'Assembleur par défaut',  distOnly:true},
+  {k:'assembleur_2',        l:'2ième Assembleur',       distOnly:true},
+  {k:'assembleur_3',        l:'3ième Assembleur',       distOnly:true},
+  {k:'mot_de_passe',        l:'Mot de passe (nouveau seulement)', exportSkip:true},
 ];
 
 function exportUsersXLSX(){
@@ -3416,7 +3437,7 @@ function exportUsersXLSX(){
     }));
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-    ws['!cols']=exportCols.map(()=>({wch:22}));
+    ws['!cols']=exportCols.map(c=>({wch:c.distOnly?24:22}));
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){
       const addr=XLSX.utils.encode_cell({r:0,c:C});
@@ -3431,24 +3452,23 @@ function exportUsersXLSX(){
 
 function downloadUsersGabarit(){
   loadXLSX(()=>{
-    const headers=USER_COLS.map(c=>c.l);
+    const exportCols=USER_COLS.filter(c=>!c.exportSkip);
+    const headers=exportCols.map(c=>c.l);
     const roles='assembleur | distributeur | conseiller | administrateur';
     const example=[
-      ['Marie','Tremblay','Assemblages HK inc.','Québec','marie.tremblay@hk.ca','assembleur','','MotDePasse123'],
-      ['Jean','Lapointe','Distribution Nord inc.','Chicoutimi','jean.lapointe@nord.ca','distributeur','','MotDePasse456'],
-      ['Sophie','Girard','Conseil régional','Lévis','sophie.girard@conseil.ca','conseiller',"Bellechasse, Montmagny, L'Islet",'MotDePasse789'],
+      ['Marie','Tremblay','Assemblages HK inc.','Québec','marie.tremblay@hk.ca','assembleur','','','','','MotDePasse123'],
+      ['Jean','Lapointe','Distribution Nord inc.','Chicoutimi','jean.lapointe@nord.ca','distributeur','','Assemblages HK inc.','','','MotDePasse456'],
+      ['Sophie','Girard','Conseil régional','Lévis','sophie.girard@conseil.ca','conseiller',"Bellechasse, Montmagny, L'Islet",'','','','MotDePasse789'],
     ];
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
-    ws['!cols']=[{wch:14},{wch:16},{wch:26},{wch:16},{wch:30},{wch:16},{wch:40},{wch:28}];
-    // Header style
+    ws['!cols']=[{wch:14},{wch:16},{wch:26},{wch:16},{wch:30},{wch:16},{wch:40},{wch:26},{wch:26},{wch:26},{wch:28}];
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){
       const addr=XLSX.utils.encode_cell({r:0,c:C});
       if(!ws[addr])continue;
       ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center'}};
     }
-    // Add note sheet
     const wsNote=XLSX.utils.aoa_to_sheet([
       ['INSTRUCTIONS'],
       [''],
@@ -3460,6 +3480,9 @@ function downloadUsersGabarit(){
       ['Courriel','Adresse courriel valide','Oui'],
       ['Rôle',roles,'Oui'],
       ['MRC(s)','Séparez plusieurs MRC par des virgules — requis pour le rôle conseiller','Non'],
+      ['Assembleur par défaut','Nom exact de la compagnie assembleur — pour les distributeurs seulement','Non'],
+      ['2ième Assembleur','Nom exact de la compagnie assembleur — pour les distributeurs seulement','Non'],
+      ['3ième Assembleur','Nom exact de la compagnie assembleur — pour les distributeurs seulement','Non'],
       ['Mot de passe (nouveau seulement)','Min. 6 caractères — requis pour créer le compte Firebase Auth','Oui (nouveaux)'],
       [''],
       ['⚠ Mise à jour','Si le courriel existe déjà, seul le profil Firestore est mis à jour (sans toucher au mot de passe).',''],
@@ -3845,6 +3868,12 @@ function renderUserForm(){
   const area=document.getElementById('uform-area');if(!area||!userFormMode)return;
   const u=userFormMode==='edit'?allUsers.find(x=>x.id===userFormId):null;
   const v=f=>u?esc(u[f]||''):'';
+  const currentRole=u?u.role:'assembleur';
+
+  // Liste des compagnies assembleurs
+  const asmCompagnies=[...new Set((allUsers||[]).filter(x=>x.role==='assembleur'&&x.actif!==false&&x.compagnie).map(x=>x.compagnie))].sort();
+  const asmOpts=(selected='')=>'<option value="">— Aucun —</option>'+asmCompagnies.map(c=>`<option value="${esc(c)}"${c===selected?' selected':''}>${esc(c)}</option>`).join('');
+
   area.innerHTML=`
     <div class="form-card">
       <div class="page-title" style="margin-bottom:4px;font-size:1.2rem">${userFormMode==='add'?'Nouvel utilisateur':'Modifier l\'utilisateur'}</div>
@@ -3856,15 +3885,37 @@ function renderUserForm(){
         <div class="form-group"><label>Ville</label><input id="uf-ville" value="${v('ville')}" placeholder="Ville"/></div>
         <div class="form-group"><label>Courriel *</label><input type="email" id="uf-email" value="${v('email')}" placeholder="courriel@exemple.com" ${userFormMode==='edit'?'disabled style="opacity:.6"':''}/></div>
         <div class="form-group"><label>Rôle *</label>
-          <select id="uf-role">
-            <option value="assembleur"${u&&u.role==='assembleur'?' selected':''}>Assembleur</option>
-            <option value="distributeur"${u&&u.role==='distributeur'?' selected':''}>Distributeur</option>
-            <option value="conseiller"${u&&u.role==='conseiller'?' selected':''}>Conseiller</option>
-            <option value="administrateur"${u&&u.role==='administrateur'?' selected':''}>Administrateur</option>
-            <option value="entreprise"${u&&u.role==='entreprise'?' selected':''}>Entreprise (sans accès)</option>
+          <select id="uf-role" onchange="ufToggleDistFields(this.value)">
+            <option value="assembleur"${currentRole==='assembleur'?' selected':''}>Assembleur</option>
+            <option value="distributeur"${currentRole==='distributeur'?' selected':''}>Distributeur</option>
+            <option value="conseiller"${currentRole==='conseiller'?' selected':''}>Conseiller</option>
+            <option value="administrateur"${currentRole==='administrateur'?' selected':''}>Administrateur</option>
+            <option value="entreprise"${currentRole==='entreprise'?' selected':''}>Entreprise (sans accès)</option>
           </select>
         </div>
         <div class="form-group full"><label>MRC(s)</label><input id="uf-mrcs" value="${u&&Array.isArray(u.mrcs)?esc(u.mrcs.join(', ')):''}" placeholder="Ex. Bellechasse, Montmagny, L'Islet"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Pour un conseiller, séparez les MRC par des virgules.</small></div>
+
+        <!-- Champs distributeur — visibles uniquement si rôle = distributeur -->
+        <div id="uf-dist-fields" class="form-group full" style="display:${currentRole==='distributeur'?'block':'none'}">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:14px 16px;margin-top:4px">
+            <div style="font-family:var(--cond);font-size:.78rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px">🔗 Assembleurs associés</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+              <div><label style="font-size:.74rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.4px">Assembleur par défaut</label>
+                <select id="uf-asm-defaut" style="width:100%;padding:7px 10px;border:1px solid #bfdbfe;border-radius:var(--r);font-size:.83rem;margin-top:4px;background:#fff">
+                  ${asmOpts(u?u.assembleur_defaut||'':'')}
+                </select></div>
+              <div><label style="font-size:.74rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.4px">2ième Assembleur</label>
+                <select id="uf-asm-2" style="width:100%;padding:7px 10px;border:1px solid #bfdbfe;border-radius:var(--r);font-size:.83rem;margin-top:4px;background:#fff">
+                  ${asmOpts(u?u.assembleur_2||'':'')}
+                </select></div>
+              <div><label style="font-size:.74rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.4px">3ième Assembleur</label>
+                <select id="uf-asm-3" style="width:100%;padding:7px 10px;border:1px solid #bfdbfe;border-radius:var(--r);font-size:.83rem;margin-top:4px;background:#fff">
+                  ${asmOpts(u?u.assembleur_3||'':'')}
+                </select></div>
+            </div>
+          </div>
+        </div>
+
         ${userFormMode==='edit'?`<div class="form-group"><label>Statut du compte</label><select id="uf-actif"><option value="true"${u&&u.actif!==false?' selected':''}>Actif</option><option value="false"${u&&u.actif===false?' selected':''}>Inactif</option></select></div>`:''}
         ${userFormMode==='add'?`<div class="form-group full"><label>Mot de passe * (min. 6 caractères)</label><input type="password" id="uf-pass" placeholder="••••••••"/></div>`
         :`<div class="form-group full"><label>Nouveau mot de passe (laisser vide = inchangé)</label><input type="password" id="uf-pass" placeholder="••••••••"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Le changement de mot de passe se fait via la console Firebase Authentication</small></div>`}
@@ -3876,6 +3927,11 @@ function renderUserForm(){
     </div>`;
 }
 
+function ufToggleDistFields(role){
+  const el=document.getElementById('uf-dist-fields');
+  if(el) el.style.display=role==='distributeur'?'block':'none';
+}
+
 async function saveUserForm(){
   const prenom=document.getElementById('uf-prenom').value.trim();
   const nom=document.getElementById('uf-nom').value.trim();
@@ -3885,6 +3941,9 @@ async function saveUserForm(){
   const role=document.getElementById('uf-role').value;
   const mrcs=(document.getElementById('uf-mrcs').value||'').split(',').map(x=>x.trim()).filter(Boolean);
   const pass=document.getElementById('uf-pass').value;
+  const asmDefaut=(document.getElementById('uf-asm-defaut')?.value||'');
+  const asm2=(document.getElementById('uf-asm-2')?.value||'');
+  const asm3=(document.getElementById('uf-asm-3')?.value||'');
   if(!prenom||!nom||!co||!role){toast('Champs obligatoires manquants','err');return}
   setSyncing(true);
   try{
@@ -3900,13 +3959,13 @@ async function saveUserForm(){
       const data=await resp.json();
       if(data.error){toast('Erreur création compte: '+data.error.message,'err');setSyncing(false);return}
       // Save profile in Firestore
-      await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,mrcs,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
+      await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
       toast('Utilisateur créé avec succès');
     } else {
       // Update Firestore profile only
       const actifEl=document.getElementById('uf-actif');
       const actif=actifEl?actifEl.value==='true':true;
-      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,actif,updatedAt:FB.serverTimestamp()});
+      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,actif,updatedAt:FB.serverTimestamp()});
       toast('Profil mis à jour');
     }
     userFormMode=null;userFormId=null;
