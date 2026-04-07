@@ -956,8 +956,8 @@ function startListeners(){
       window.allAvisInstal=[];
       snap.forEach(d=>window.allAvisInstal.push({id:d.id,...d.data()}));
       if(currentPanel==='avisInstal') renderAvisInstal();
+      if(currentPanel==='dashboard') renderDashboard();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
-  }
   }
 }
 
