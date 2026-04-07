@@ -975,6 +975,45 @@ function renderPanel(){
   else renderUsers();
 }
 
+async function assignHkToAvis(avisId, hk, selectEl){
+  if(!hk) return;
+  // Trouver l'avis et l'enregistrement HK
+  const avis=(window.allAvisInstal||[]).find(a=>a.id===avisId);
+  const rec=allRecords.find(r=>r.no_serie_hk===hk);
+  if(!avis||!rec){toast('Avis ou enregistrement introuvable','err');return;}
+
+  confirm2(`Attribuer le N° ${hk} à l'avis de ${avis.prenom_client||''} ${avis.nom_client||''} ?\nLe tableau de suivi sera mis à jour avec les informations de l'avis.`, async()=>{
+    setSyncing(true);
+    try{
+      // 1. Mettre à jour AvisInstal avec le N° HK
+      await FB.updateDoc(FB.doc(FB.db,'AvisInstal',avisId),{
+        no_serie_hk: hk,
+        updatedAt: FB.serverTimestamp()
+      });
+      // 2. Mettre à jour le record dans Tableau de suivi
+      await FB.updateDoc(FB.doc(FB.db,'records',rec.id),{
+        nom_entrepreneur:   avis.nom_entreprise_install||rec.nom_entrepreneur||'',
+        nom_installateur:   avis.nom_entreprise_install||rec.nom_installateur||'',
+        adresse_site:       avis.no_civique_rue||rec.adresse_site||'',
+        ville_livraison:    avis.ville_site||rec.ville_livraison||'',
+        conseiller:         avis.conseiller_regional||rec.conseiller||'',
+        identification_site:avis.no_lot||rec.identification_site||'',
+        statut:             "Avis d'installation",
+        derniere_modif:     nowStr(),
+        dernier_utilisateur:session.email||session.nom||'',
+        updatedAt:          FB.serverTimestamp()
+      });
+      toast('N° '+hk+' attribué — tableau de suivi mis à jour ✓');
+    }catch(e){
+      toast('Erreur: '+e.message,'err');
+      if(selectEl) selectEl.value='';
+    }
+    setSyncing(false);
+  });
+  // Reset select si annulation
+  if(selectEl) selectEl.value='';
+}
+
 // ════════════════════════════════════════════════════════
 // DASHBOARD ASSEMBLEUR
 // ════════════════════════════════════════════════════════
@@ -984,9 +1023,16 @@ let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 function renderDashboard(){
   if(asmView) { renderTableauFiltered(); return; }
   const rows = getRows();
+  // Stock = Fabriqué SANS avis d'installation attaché
   const stock  = rows.filter(r=>r.statut==='Fabriqué');
-  const avis   = rows.filter(r=>r.statut==="Avis d'installation");
-  const avisMe = avis.filter(r=>(r.assembleur_attribue||'')===(session.compagnie||''));
+  // Avis = statut Avis d'installation AVEC numéro de série HK
+  const avis   = rows.filter(r=>r.statut==="Avis d'installation" && r.no_serie_hk);
+  // Mes avis à traiter = assembleur_attribue correspond + PAS de numéro de série HK dans AvisInstal
+  const allAvis = window.allAvisInstal||[];
+  const avisMe = allAvis.filter(r=>
+    (r.assembleur_attribue||'')===(session.compagnie||'') &&
+    !r.no_serie_hk
+  );
   const livre  = rows.filter(r=>r.statut==='Livré vers distributeur'||r.statut==='Livré vers entreprise');
 
   function byProduit(list){
@@ -1029,14 +1075,22 @@ function renderDashboard(){
   const prodStock=byProduit(stock);
   const prodAvis=byProduit(avis);
 
+  // Numéros de série disponibles (Fabriqué, pas encore associé à un avis)
+  const hkDispo = rows.filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort();
+
   // Liste des avis attribués à cet assembleur
-  const avisRows=avisMe.length?avisMe.slice(0,8).map(r=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
-      <span style="font-family:var(--cond);font-size:.78rem;font-weight:700;color:var(--blue);min-width:100px">${esc(r.no_serie_hk||'—')}</span>
-      <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.nom_client||'')} ${esc(r.ville_livraison||r.ville_site||'')}</span>
-      <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600">${esc(r.produit_principal||'—')}</span>
+  const avisRows=avisMe.length?avisMe.map(r=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--mist)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.prenom_client||'')+' '+(r.nom_client||''))}, ${esc(r.ville_site||'')}</span>
+        <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600;white-space:nowrap">${esc(r.produit_principal||'—')}</span>
+      </div>
+      <select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">
+        <option value="">— Attribuer N° série HK —</option>
+        ${hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('')}
+      </select>
     </div>`).join('')+(avisMe.length>8?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-8} autre${avisMe.length-8>1?'s':''}</div>`:'')
-    :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis attribué</div>';
+    :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis à traiter</div>';
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
@@ -1054,7 +1108,7 @@ function renderDashboard(){
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🔧 Stock — Fabriqués</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Prêts à être livrés</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Prêts à être livrés (sans avis d'installation attribué)</div>
           </div>
           <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green)">${stock.length}</div>
         </div>
@@ -1072,7 +1126,7 @@ function renderDashboard(){
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Avis d'installation</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Tous statuts Avis</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Avec numéro de série HK attribué</div>
           </div>
           <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--blue)">${avis.length}</div>
         </div>
@@ -1093,8 +1147,8 @@ function renderDashboard(){
       <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📌 Mes avis attribués</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Assignés à ${esc(session.compagnie||'')}</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📌 Avis d'installation à traiter</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Assignés à ${esc(session.compagnie||'')} — Numéros de série à attribuer</div>
           </div>
           <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#0891b2">${avisMe.length}</div>
         </div>
@@ -1118,8 +1172,8 @@ function renderDashboard(){
         <div style="padding:14px 20px 8px">
           <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Cliquez sur une période pour filtrer</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-            ${statBox('Mois en cours<br><small style="color:var(--silver)">${nomMois}</small>',livreMois.length,'#7c3aed','mois')}
-            ${statBox('Année en cours<br><small style="color:var(--silver)">${y}</small>',livreAnnee.length,'#5b21b6','annee')}
+            ${statBox('Mois en cours',livreMois.length,'#7c3aed','mois')}
+            ${statBox('Année en cours',livreAnnee.length,'#5b21b6','annee')}
             ${statBox('6 derniers mois',livreS6.length,'#8b5cf6','6mois')}
             ${statBox('+12 mois',plusAn.length,'#a78bfa','plus12')}
           </div>
@@ -1201,8 +1255,8 @@ function renderTableauFiltered(){
         </div>
       </div>
       <div class="page-actions">
-        <button class="btn btn-blue" onclick="exportCSV()">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V19h2v-4.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/></svg>CSV
+        <button class="btn btn-blue" onclick="exportXLSX()" style="background:#217346;border-color:#217346">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Export XLSX
         </button>
       </div>
     </div>
@@ -1250,28 +1304,25 @@ const COLS_ADMIN=[
   {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
 ];
 const COLS_ASM=[
-  {k:'po_assembleur',        l:'#PO Assembleur'},
-  {k:'po_norweco',           l:'#PO Norweco'},
-  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
-  {k:'recu_le',              l:'Date réception assembleur', t:'date'},
-  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
-  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'po_assembleur',        l:'#PO Assembleur', ro:true},
+  {k:'po_norweco',           l:'#PO Norweco', ro:true},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur', ro:true},
+  {k:'recu_le',              l:'Date réception assembleur', t:'date', ro:true},
+  {k:'no_serie_hk',          l:'N° Série HK', hk:true, ro:true},
+  {k:'produit_principal',    l:'Produit Principal', ro:true},
   {k:'produit2',             l:'Produit #2'},
   {k:'produit3',             l:'Produit #3'},
-  {k:'conseiller',           l:'Conseiller'},
+  {k:'conseiller',           l:'Conseiller', ro:true},
   {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
-  {k:'nom_installateur',     l:'Installateur autorisé'},
-  {k:'hydro_prime_cumules',  l:'Hydro-prime cumulés ($)',  t:'num'},
-  {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
-  {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
+  {k:'nom_installateur',     l:'Installateur autorisé', ro:true},
   {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
   {k:'type_client',          l:"Entrepreneur direct ou distributeur ?", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
   {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
   {k:'notes_assembleur',     l:'Notes assembleur'},
-  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:"Identification du site d'installation"},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur', ro:true},
+  {k:'identification_site',  l:"Identification du site d'installation", ro:true},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_DIST=[
@@ -1447,6 +1498,7 @@ function rowHtml(row,cols){
   const cells=cols.map(c=>{
     const v=row[c.k]??'';
     if(isE){
+      if(c.ro) return`<td>${esc(v)||'—'}</td>`; // lecture seule
       if(c.t==='sel'){const o=c.opts.map(x=>`<option value="${esc(x)}"${v===x?' selected':''}>${esc(x)}</option>`).join('');return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
       if(c.t==='date')return`<td><input type="date" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
       if(c.t==='num')return`<td><input type="number" step="0.01" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value" style="width:90px"/></td>`;
