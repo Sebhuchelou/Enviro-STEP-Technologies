@@ -1328,7 +1328,8 @@ function renderConseillerDashboard(){
   const livMois  = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startMois&&d<=now;})());
   const livAnnee = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startAnnee&&d<=now;})());
 
-  // Nouvelles entreprises ce mois (première apparition dans myAvis ce mois)
+  // Nouvelles entreprises ce mois — UNIQUEMENT celles qui ne sont pas encore dans allUsers (role=entreprise)
+  const entreprisesUsers = new Set((allU||[]).filter(u=>u.role==='entreprise'&&u.actif!==false).map(u=>(u.compagnie||'').toLowerCase().trim()));
   const entreprisesVues = new Set();
   const entreprisesMois = [];
   [...myAvis].sort((a,b)=>{const da=avisDate(a)||new Date(0),db=avisDate(b)||new Date(0);return da-db;})
@@ -1336,8 +1337,12 @@ function renderConseillerDashboard(){
       const e=r.nom_entreprise_install||r.nom_entrepreneur||'';
       if(!e) return;
       const d=avisDate(r);
-      if(d&&d>=startMois&&!entreprisesVues.has(e)) entreprisesMois.push({nom:e, date:d});
-      entreprisesVues.add(e);
+      const eKey=e.toLowerCase().trim();
+      // Inclure seulement si : ce mois, première apparition, ET pas encore dans users
+      if(d&&d>=startMois&&!entreprisesVues.has(eKey)&&!entreprisesUsers.has(eKey)){
+        entreprisesMois.push({nom:e, date:d, avis:r});
+      }
+      entreprisesVues.add(eKey);
     });
 
   // Entreprises inactives — dernière date d'avis < seuil
@@ -1361,12 +1366,12 @@ function renderConseillerDashboard(){
   const assembleurs = allU.filter(u=>u.role==='assembleur'&&u.actif!==false&&u.ville);
   const distributeurs = allU.filter(u=>u.role==='distributeur'&&u.actif!==false&&u.ville);
 
-  // Résumé HydroPrime
-  const totalCumule  = allHP.reduce((s,r)=>s+(r.hydro_prime_cumule||0),0);
-  const totalUtilise = allHP.reduce((s,r)=>s+(r.hydro_prime_utilises||0),0);
-  const totalRestant = allHP.reduce((s,r)=>s+(r.hydro_prime_restants||0),0);
+  // Résumé HydroPrime — en unités HP
+  const totalCumule  = allHP.reduce((s,r)=>s+(r.hp_cumules||0),0);
+  const totalUtilise = allHP.reduce((s,r)=>s+(r.hp_utilises||0),0);
+  const totalRestant = allHP.reduce((s,r)=>s+(r.hp_restants||0),0);
 
-  const fmt$ = v => new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0}).format(v||0);
+  const fmtHP = v => `${v} HP`;
 
   const seuilOpts=['plus1','plus3','plus6','plus12'];
   const seuilLabels={'plus1':'Plus d\'1 mois','plus3':'Plus de 3 mois','plus6':'Plus de 6 mois','plus12':'Plus de 12 mois'};
@@ -1418,17 +1423,19 @@ function renderConseillerDashboard(){
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🆕 Nouvelles entreprises</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Premier avis ce mois-ci</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Premier avis ce mois — pas encore dans le système</div>
           </div>
           <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#7c3aed">${entreprisesMois.length}</div>
         </div>
-        <div style="padding:14px 20px;max-height:200px;overflow-y:auto">
+        <div style="padding:14px 20px;max-height:220px;overflow-y:auto">
           ${entreprisesMois.length?entreprisesMois.map(e=>`
-            <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--mist)">
               <div style="width:6px;height:6px;border-radius:50%;background:#7c3aed;flex-shrink:0"></div>
               <span style="font-size:.78rem;color:var(--charcoal);font-weight:600;flex:1">${esc(e.nom)}</span>
-              <span style="font-size:.72rem;color:var(--slate)">${e.date.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span>
-            </div>`).join(''):'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune nouvelle entreprise ce mois</div>'}
+              <span style="font-size:.7rem;color:var(--slate);margin-right:4px">${e.date.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span>
+              <button onclick="openCreateEntrepriseModal('${e.nom.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${esc(e.avis?.ville_site||'').replace(/'/g,"\\'")}')" style="padding:3px 9px;border-radius:3px;border:1px solid #7c3aed;background:#f5f3ff;color:#7c3aed;font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ Créer</button>
+            </div>`).join('')
+          :'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune nouvelle entreprise ce mois</div>'}
         </div>
       </div>
 
@@ -1463,23 +1470,24 @@ function renderConseillerDashboard(){
       <div style="background:#fff;border-radius:8px;border-left:5px solid #f59e0b;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:16px 20px 12px;border-bottom:1px solid var(--mist)">
           <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">💰 Hydro-Prime</div>
-          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${allHP.length} entreprise${allHP.length!==1?'s':''} inscrites</div>
+          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${allHP.length} entreprise${allHP.length!==1?'s':''} — 1 installation = 1 HP</div>
         </div>
         <div style="padding:14px 20px">
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fffbeb;border-radius:6px;border:1px solid #fde68a">
-              <span style="font-size:.78rem;font-weight:600;color:#92400e">Cumulés</span>
-              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#b45309">${fmt$(totalCumule)}</span>
+              <span style="font-size:.78rem;font-weight:600;color:#92400e">HP Cumulés</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#b45309">${totalCumule} HP</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca">
-              <span style="font-size:.78rem;font-weight:600;color:#991b1b">Utilisés</span>
-              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#dc2626">${fmt$(totalUtilise)}</span>
+              <span style="font-size:.78rem;font-weight:600;color:#991b1b">HP Utilisés</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#dc2626">${totalUtilise} HP</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">
-              <span style="font-size:.78rem;font-weight:600;color:#166534">Restants</span>
-              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:var(--green-dark)">${fmt$(totalRestant)}</span>
+              <span style="font-size:.78rem;font-weight:600;color:#166534">HP Restants</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:var(--green-dark)">${totalRestant} HP</span>
             </div>
           </div>
+          <div style="font-size:.71rem;color:var(--slate);margin-bottom:10px">💵 5 HP min. = crédit (1 HP = 100 $) &nbsp;|&nbsp; 🎁 10 HP min. = cadeau (~2 000 $)</div>
           <button onclick="renderHydroPrimeTable()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid #f59e0b;background:transparent;color:#b45309;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
@@ -1521,6 +1529,70 @@ function renderConseillerDashboard(){
   setTimeout(()=>loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois), 100);
 }
 
+// ── Créer entreprise depuis dashboard conseiller ──────
+function openCreateEntrepriseModal(nomEntreprise, ville){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:8px;width:100%;max-width:520px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid #7c3aed">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#222">🆕 Créer l'entreprise</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:2px">Rôle Entreprise — aucun accès à l'application</div>
+        </div>
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+      </div>
+      <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+        <div><label style="font-size:.72rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Compagnie *</label>
+          <input id="ce-co" value="${esc(nomEntreprise||'')}" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Ville</label>
+          <input id="ce-ville" value="${esc(ville||'')}" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Téléphone</label>
+          <input id="ce-tel" value="" placeholder="418-555-0000" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Courriel</label>
+          <input id="ce-email" type="email" value="" placeholder="contact@entreprise.ca" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+        <button onclick="confirmCreateEntreprise()" style="padding:8px 20px;border-radius:var(--r);border:2px solid #7c3aed;background:#7c3aed;color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">💾 Créer</button>
+      </div>
+    </div>`;
+  overlay.style.display='flex';
+}
+
+async function confirmCreateEntreprise(){
+  const co   = document.getElementById('ce-co')?.value.trim()||'';
+  const ville= document.getElementById('ce-ville')?.value.trim()||'';
+  const tel  = document.getElementById('ce-tel')?.value.trim()||'';
+  const email= document.getElementById('ce-email')?.value.trim()||'';
+  if(!co){toast('Compagnie requise','err');return;}
+  setSyncing(true);
+  try{
+    // Créer user entreprise
+    await FB.addDoc(FB.collection(FB.db,'users'),{
+      compagnie:co, ville, telephone:tel, email,
+      role:'entreprise', actif:true,
+      prenom:'', nom:'',
+      createdAt:FB.serverTimestamp(), updatedAt:FB.serverTimestamp()
+    });
+    // Créer HydroPrime
+    const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===co&&(r.statut||'').startsWith('Livré'));
+    const hpCum=livres.length;
+    const existingHP=(window.allHydroPrime||[]).find(h=>(h.nom_entreprise||'')===co);
+    if(!existingHP){
+      await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{
+        nom_entreprise:co, ville, telephone:tel,
+        hp_cumules:hpCum, hp_utilises:0, hp_restants:hpCum,
+        createdAt:FB.serverTimestamp(), updatedAt:FB.serverTimestamp()
+      });
+    }
+    document.getElementById('attr-overlay').style.display='none';
+    toast(`Entreprise "${co}" créée ✓`);
+  }catch(e){toast('Erreur: '+e.message,'err')}
+  setSyncing(false);
+}
+
 function switchToConsTableau(){
   currentPanel='tableau';
   // Highlight nav button if exists
@@ -1535,24 +1607,29 @@ function switchToConsTableau(){
 function renderHydroPrimeTable(){
   const allHP=window.allHydroPrime||[];
   const sorted=[...allHP].sort((a,b)=>(a.nom_entreprise||'').localeCompare(b.nom_entreprise||'','fr'));
-  const fmt$=v=>new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0}).format(v||0);
 
   const rows=sorted.length?sorted.map(r=>{
     const isE=editingId===r.id;
-    const utilises=isE?(editBuf.hydro_prime_utilises??r.hydro_prime_utilises??0):(r.hydro_prime_utilises||0);
-    const cumule=r.hydro_prime_cumule||0;
+    const utilises=isE?(editBuf.hp_utilises??r.hp_utilises??0):(r.hp_utilises||0);
+    const cumule=r.hp_cumules||0;
+    const restants=cumule-utilises;
     const pct=cumule>0?Math.round((utilises/cumule)*100):0;
+    const eligBadge=restants>=10?'<span title="🎁 Cadeau éligible" style="margin-left:4px;font-size:.8rem">🎁</span>':restants>=5?'<span title="💵 Crédit éligible" style="margin-left:4px;font-size:.8rem">💵</span>':'';
     return`<tr id="row-${r.id}">
       <td style="font-weight:600;color:var(--charcoal)">${esc(r.nom_entreprise||'—')}</td>
       <td>${esc(r.ville||'—')}</td>
       <td>${esc(r.telephone||'—')}</td>
-      <td style="text-align:right;font-family:var(--cond);font-weight:700;color:#b45309">${fmt$(cumule)}</td>
-      <td style="text-align:right">
+      <td style="text-align:center"><span style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:#b45309">${cumule}</span></td>
+      <td style="text-align:center">
         ${isE
-          ?`<input type="number" step="0.01" value="${utilises}" oninput="editBuf.hydro_prime_utilises=parseFloat(this.value)||0" style="width:110px;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.82rem;background:#e8f4fd"/>`
-          :`<span style="font-family:var(--cond);font-weight:700;color:#dc2626">${fmt$(utilises)}</span>`}
+          ?`<input type="number" min="0" max="${cumule}" value="${utilises}" oninput="editBuf.hp_utilises=parseInt(this.value)||0" style="width:70px;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.82rem;text-align:center;background:#e8f4fd"/>`
+          :`<span style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:#dc2626">${utilises}</span>`}
       </td>
-      <td style="text-align:right;font-family:var(--cond);font-weight:700;color:var(--green-dark)">${fmt$(cumule-utilises)}</td>
+      <td style="text-align:center">
+        <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+          <span style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:${restants>=5?'var(--green-dark)':'#92400e'}">${restants}</span>${eligBadge}
+        </div>
+      </td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <div style="flex:1;height:6px;background:var(--mist);border-radius:3px;overflow:hidden;min-width:60px"><div style="height:100%;background:${pct>80?'#dc2626':'#f59e0b'};width:${Math.min(pct,100)}%;border-radius:3px"></div></div>
@@ -1585,9 +1662,9 @@ function renderHydroPrimeTable(){
         <table>
           <thead><tr>
             <th>Entreprise</th><th>Ville</th><th>Téléphone</th>
-            <th style="text-align:right">Cumulés</th>
-            <th style="text-align:right">Utilisés</th>
-            <th style="text-align:right">Restants</th>
+            <th style="text-align:center;background:#fffbeb;color:#b45309">HP Cumulés</th>
+            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés ✎</th>
+            <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">HP Restants</th>
             <th style="min-width:120px">Utilisation</th>
             <th>Actions</th>
           </tr></thead>
@@ -1606,12 +1683,12 @@ function startEditHP(id){
 async function saveHydroPrime(id){
   setSyncing(true);
   try{
-    const utilises=parseFloat(editBuf.hydro_prime_utilises)||0;
+    const utilises=parseInt(editBuf.hp_utilises)||0;
     const r=(window.allHydroPrime||[]).find(x=>x.id===id);
-    const cumule=r?r.hydro_prime_cumule||0:0;
+    const cumule=r?r.hp_cumules||0:0;
     await FB.updateDoc(FB.doc(FB.db,'HydroPrime',id),{
-      hydro_prime_utilises: utilises,
-      hydro_prime_restants: cumule-utilises,
+      hp_utilises: utilises,
+      hp_restants: cumule-utilises,
       updatedAt: FB.serverTimestamp()
     });
     editingId=null;editBuf={};
@@ -2247,9 +2324,9 @@ const COLS_ADMIN=[
   {k:'conseiller',           l:'Conseiller'},
   {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
   {k:'nom_installateur',     l:'Installateur autorisé'},
-  {k:'hydro_prime_cumules',  l:'Hydro-prime cumulés ($)',  t:'num'},
-  {k:'hydro_prime_utilises', l:'Hydro-prime utilisés ($)', t:'num'},
-  {k:'hydro_prime_restants', l:'Hydro-prime restants ($)', t:'num'},
+  {k:'hydro_prime_cumules',  l:'HP cumulés',  t:'num'},
+  {k:'hydro_prime_utilises', l:'HP utilisés', t:'num'},
+  {k:'hydro_prime_restants', l:'HP restants', t:'num'},
   {k:'date_livraison',       l:'Date livraison assembleur',t:'date'},
   {k:'type_client',          l:"Entrepreneur direct ou distributeur ?", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
@@ -2604,34 +2681,31 @@ async function saveRow(id){
 // ── Met à jour (ou crée) le document HydroPrime pour une entreprise ──
 async function updateHydroPrime(nomEntreprise){
   if(!nomEntreprise) return;
-  // Compter les records livrés pour cette entreprise
+  // 1 installation livrée = 1 HP
   const livres=allRecords.filter(r=>
     (r.nom_entrepreneur||'')=== nomEntreprise &&
     (r.statut||'').startsWith('Livré')
   );
-  const cumule = livres.length * 100;
+  const hpCumules = livres.length;
 
-  // Chercher le doc existant
   const q=await FB.getDocs(FB.query(FB.collection(FB.db,'HydroPrime'),FB.where('nom_entreprise','==',nomEntreprise)));
   if(q.empty){
-    // Créer
     await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{
       nom_entreprise: nomEntreprise,
-      ville: '',
-      telephone: '',
-      hydro_prime_cumule: cumule,
-      hydro_prime_utilises: 0,
-      hydro_prime_restants: cumule,
+      ville:'', telephone:'',
+      hp_cumules: hpCumules,
+      hp_utilises: 0,
+      hp_restants: hpCumules,
       updatedAt: FB.serverTimestamp(),
       createdAt: FB.serverTimestamp()
     });
   } else {
     const docRef=q.docs[0].ref;
     const existing=q.docs[0].data();
-    const utilises=existing.hydro_prime_utilises||0;
+    const utilises=existing.hp_utilises||0;
     await FB.updateDoc(docRef,{
-      hydro_prime_cumule: cumule,
-      hydro_prime_restants: cumule - utilises,
+      hp_cumules: hpCumules,
+      hp_restants: hpCumules - utilises,
       updatedAt: FB.serverTimestamp()
     });
   }
@@ -3525,6 +3599,7 @@ function openUsersImport(){
 function closeUsersImport(){
   const overlay = document.getElementById('users-import-overlay');
   if(overlay) overlay.style.display = 'none';
+  window._entImportMode = false;
 }
 
 function usersImportDrop(e){
@@ -3578,6 +3653,8 @@ const UI_MAP = {
   'assembleur par défaut':'assembleur_defaut','assembleur par defaut':'assembleur_defaut',
   '2ième assembleur':'assembleur_2','2ieme assembleur':'assembleur_2','2e assembleur':'assembleur_2',
   '3ième assembleur':'assembleur_3','3ieme assembleur':'assembleur_3','3e assembleur':'assembleur_3',
+  'hp utilisés':'hp_utilises','hp utilises':'hp_utilises','hydro-prime utilisés':'hp_utilises',
+  'téléphone':'telephone','telephone':'telephone',
   'mot de passe (nouveau seulement)':'password',
   'mot de passe':'password','password':'password','mdp':'password',
 };
@@ -3585,11 +3662,21 @@ const UI_VALID_ROLES = ['assembleur','distributeur','conseiller','administrateur
 
 function uiBuildPreview(headers, rows){
   const colMap = headers.map(h => UI_MAP[h.toLowerCase().trim()] || null);
+  const entMode = !!window._entImportMode; // import entreprises — pas de Auth
 
   uiParsed = rows.map((row, i) => {
     if(row.every(c=>!String(c).trim())) return null;
     const rec = {};
     colMap.forEach((key,ci)=>{ if(key) rec[key] = String(row[ci]||'').trim(); });
+
+    // Mode entreprises : forcer rôle + valider uniquement compagnie
+    if(entMode){
+      rec.role = 'entreprise';
+      if(!rec.compagnie) return { rec, row:i+2, status:'err', reason:'Compagnie manquante' };
+      const dup = allUsers.find(u=>u.role==='entreprise'&&(u.compagnie||'').toLowerCase()===(rec.compagnie||'').toLowerCase());
+      if(dup) return { rec, row:i+2, status:'warn', reason:'Doublon — profil sera mis à jour', existingId:dup.id };
+      return { rec, row:i+2, status:'ok', reason:'' };
+    }
 
     if(!rec.email)   return { rec, row:i+2, status:'err', reason:'Courriel manquant' };
     if(!rec.prenom)  return { rec, row:i+2, status:'err', reason:'Prénom manquant' };
@@ -3597,10 +3684,8 @@ function uiBuildPreview(headers, rows){
 
     const dup = allUsers.find(u => (u.email||'').toLowerCase() === rec.email.toLowerCase());
     if(dup){
-      // Doublon existant → mise à jour autorisée (pas bloqué)
       if(rec.role) rec.role = rec.role.toLowerCase(); else rec.role = dup.role||'assembleur';
       if(rec.mrcs) rec.mrcs = rec.mrcs.split(',').map(x=>x.trim()).filter(Boolean); else rec.mrcs = dup.mrcs||[];
-      // Conserver le mot de passe si fourni, sinon mettre un placeholder (ne sera pas utilisé)
       if(!rec.password) rec.password = '________';
       return { rec, row:i+2, status:'warn', reason:'Doublon — profil sera mis à jour', existingId: dup.id };
     }
@@ -3703,8 +3788,26 @@ async function confirmUsersImport(){
       }
       if(rec.role === 'entreprise'){
         // Pas de compte Firebase Auth — écriture directe Firestore avec ID auto
-        await FB.addDoc(FB.collection(FB.db,'users'), rec);
-        added++;
+        // Vérifier si l'entreprise existe déjà par compagnie
+        const existingEnt = allUsers.find(u=>u.role==='entreprise'&&(u.compagnie||'')===(rec.compagnie||''));
+        if(existingEnt){
+          const updateRec={...rec}; delete updateRec.createdAt;
+          await FB.setDoc(FB.doc(FB.db,'users',existingEnt.id),updateRec,{merge:true});
+          updated++;
+        } else {
+          const docRef = await FB.addDoc(FB.collection(FB.db,'users'), rec);
+          added++;
+        }
+        // Créer/màj HydroPrime
+        const hpUtil=parseInt(rec.hp_utilises||rec['hp utilisés']||'0')||0;
+        const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===(rec.compagnie||'')&&(r.statut||'').startsWith('Livré'));
+        const hpCum=livres.length; const hpRest=hpCum-hpUtil;
+        const existingHP=(window.allHydroPrime||[]).find(h=>(h.nom_entreprise||'')===(rec.compagnie||''));
+        if(existingHP){
+          await FB.updateDoc(FB.doc(FB.db,'HydroPrime',existingHP.id),{nom_entreprise:rec.compagnie||'',ville:rec.ville||'',telephone:rec.telephone||'',hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,updatedAt:FB.serverTimestamp()});
+        } else {
+          await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:rec.compagnie||'',ville:rec.ville||'',telephone:rec.telephone||'',hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
+        }
       } else {
         // Retry loop pour gérer TOO_MANY_ATTEMPTS
         let authDone = false;
@@ -3850,13 +3953,25 @@ function renderUsers(){
   const tousCount       = allUsers.filter(u=>u.role!=='entreprise').length;
   const entrepriseCount = allUsers.filter(u=>u.role==='entreprise').length;
 
-  const tabStyle = (active, color, bgActive) =>
+  const tabStyle = (active, color) =>
     'padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;'
     +'border-bottom:3px solid '+(active?color:'transparent')+';color:'+(active?color:'var(--slate)');
   const pillStyle = (active, color, bg) =>
     'padding:2px 7px;border-radius:12px;font-size:11px;background:'+(active?bg:'var(--mist)')+';color:'+(active?color:'var(--slate)');
 
   const main=document.getElementById('app-main');
+
+  if(usersFilter==='entreprise'){ renderEntreprisesTable(); return; }
+
+  const tabsHtml =
+    '<div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh);flex-wrap:wrap">'
+    +'<button onclick="usersFilter=\'actif\';renderUsers()"      style="'+tabStyle(usersFilter==='actif','var(--green-dark)')+'">Actifs <span style="'+pillStyle(usersFilter==='actif','var(--green-dark)','var(--green-pale)')+'">'+actifCount+'</span></button>'
+    +'<button onclick="usersFilter=\'inactif\';renderUsers()"    style="'+tabStyle(usersFilter==='inactif','var(--err)')+'">Inactifs <span style="'+pillStyle(usersFilter==='inactif','var(--err)','var(--err-l)')+'">'+inactifCount+'</span></button>'
+    +'<button onclick="usersFilter=\'tous\';renderUsers()"       style="'+tabStyle(usersFilter==='tous','var(--blue)')+'">Tous <span style="'+pillStyle(usersFilter==='tous','var(--blue)','var(--blue-pale)')+'">'+tousCount+'</span></button>'
+    +'<div style="width:1px;background:var(--mist);margin:8px 6px;align-self:stretch"></div>'
+    +'<button onclick="usersFilter=\'entreprise\';renderUsers()" style="'+tabStyle(false,'#b45309')+'">🏢 Entreprises / HP <span style="'+pillStyle(false,'#b45309','#fef3c7')+'">'+entrepriseCount+'</span></button>'
+    +'</div>';
+
   main.innerHTML=
     '<div class="page-header">'
     +'<div><div class="page-title">Gestion des utilisateurs</div>'
@@ -3864,47 +3979,228 @@ function renderUsers(){
     +'</div>'
     +'<div class="page-actions" id="users-page-actions"></div>'
     +'</div>'
-    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh);flex-wrap:wrap">'
-    +'<button onclick="usersFilter=\'actif\';renderUsers()"      style="'+tabStyle(usersFilter==='actif',   'var(--green-dark)','')+'">Actifs <span style="'+pillStyle(usersFilter==='actif','var(--green-dark)','var(--green-pale)')+'">'+actifCount+'</span></button>'
-    +'<button onclick="usersFilter=\'inactif\';renderUsers()"    style="'+tabStyle(usersFilter==='inactif', 'var(--err)',       '')+'">Inactifs <span style="'+pillStyle(usersFilter==='inactif','var(--err)','var(--err-l)')+'">'+inactifCount+'</span></button>'
-    +'<button onclick="usersFilter=\'tous\';renderUsers()"       style="'+tabStyle(usersFilter==='tous',    'var(--blue)',      '')+'">Tous <span style="'+pillStyle(usersFilter==='tous','var(--blue)','var(--blue-pale)')+'">'+tousCount+'</span></button>'
-    +'<div style="width:1px;background:var(--mist);margin:8px 6px;align-self:stretch"></div>'
-    +'<button onclick="usersFilter=\'entreprise\';renderUsers()" style="'+tabStyle(usersFilter==='entreprise','#b45309','')+'">🏢 Entreprises <span style="'+pillStyle(usersFilter==='entreprise','#b45309','#fef3c7')+'">'+entrepriseCount+'</span></button>'
-    +'</div>'
+    +tabsHtml
     +'<div id="uform-area"></div>'
-    +'<div class="users-grid">'+(cards||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>')+'</div>';
+    +'<div class="users-grid">'+(cardsHtml||'<p style="color:var(--slate);padding:24px">Aucun utilisateur trouvé.</p>')+'</div>';
 
-  // Build action buttons safely
   const actions=document.getElementById('users-page-actions');
   const mkBtn=(cls,label,icon,fn,extraStyle)=>{
-    const b=document.createElement('button');
-    b.className='btn '+cls;
+    const b=document.createElement('button');b.className='btn '+cls;
     if(extraStyle)b.style.cssText=extraStyle;
-    b.innerHTML=icon+label;
-    b.addEventListener('click',fn);
-    actions.appendChild(b);
+    b.innerHTML=icon+label;b.addEventListener('click',fn);actions.appendChild(b);
   };
-  const iconAdd='<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+  const iconAdd ='<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
   const iconXlsx='<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>';
-  const iconDl='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
-  const iconUp='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
-  mkBtn('btn-primary',   'Ajouter',       iconAdd,  ()=>showUserForm('add'));
-  mkBtn('btn-blue',      'Export XLSX',   iconXlsx, ()=>exportUsersXLSX(), 'background:#217346;border-color:#217346');
-  mkBtn('btn-secondary', 'Gabarit XLSX',  iconDl,   ()=>downloadUsersGabarit());
-  mkBtn('btn-secondary', 'Importer XLSX', iconUp,   ()=>openUsersImport());
+  const iconDl  ='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+  const iconUp  ='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
+  mkBtn('btn-primary',  'Ajouter',       iconAdd,  ()=>showUserForm('add'));
+  mkBtn('btn-blue',     'Export XLSX',   iconXlsx, ()=>exportUsersXLSX(),'background:#217346;border-color:#217346');
+  mkBtn('btn-secondary','Gabarit XLSX',  iconDl,   ()=>downloadUsersGabarit());
+  mkBtn('btn-secondary','Importer XLSX', iconUp,   ()=>openUsersImport());
 
-  // Delegate edit/delete on cards — global handler, no removeEventListener
-  main.onclick = function(e){
-    const editBtn     = e.target.closest('[data-edit]');
-    const delBtn      = e.target.closest('[data-del]');
-    const permadelBtn = e.target.closest('[data-permadel]');
+  main.onclick=function(e){
+    const editBtn=e.target.closest('[data-edit]');
+    const delBtn=e.target.closest('[data-del]');
+    const permadelBtn=e.target.closest('[data-permadel]');
     if(editBtn)     editUser(editBtn.dataset.edit);
     if(delBtn)      deleteUser(delBtn.dataset.del);
     if(permadelBtn) deleteUserPermanent(permadelBtn.dataset.permadel);
   };
-
   if(userFormMode)renderUserForm();
 }
+
+// ════════════════════════════════════════════════════════
+// TABLEAU ENTREPRISES / HYDRO-PRIME
+// ════════════════════════════════════════════════════════
+let selectedEntreprises = new Set();
+
+function renderEntreprisesTable(){
+  const main=document.getElementById('app-main');
+  const allHP=window.allHydroPrime||[];
+  const entreprises=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
+  const rows=entreprises.map(u=>{
+    const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
+    return{...u,hp_cumules:hp.hp_cumules||0,hp_utilises:hp.hp_utilises||0,hp_restants:hp.hp_restants||0,_hpId:hp.id||null};
+  });
+
+  const tabStyle=(active,color)=>'padding:12px 20px;font-family:var(--cond);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;border-bottom:3px solid '+(active?color:'transparent')+';color:'+(active?color:'var(--slate)');
+  const pillStyle=(active,color,bg)=>'padding:2px 7px;border-radius:12px;font-size:11px;background:'+(active?bg:'var(--mist)')+';color:'+(active?color:'var(--slate)');
+  const actifCount=allUsers.filter(u=>u.actif!==false&&u.role!=='entreprise').length;
+  const inactifCount=allUsers.filter(u=>u.actif===false&&u.role!=='entreprise').length;
+  const tousCount=allUsers.filter(u=>u.role!=='entreprise').length;
+  const hasSelEnt=selectedEntreprises.size>0;
+  const allChecked=rows.length>0&&rows.every(r=>selectedEntreprises.has(r.id));
+
+  const tblRows=rows.length?rows.map(r=>{
+    const isE=editingId===r.id;
+    const sel=selectedEntreprises.has(r.id);
+    const hpBadge=(val,color,bg)=>`<span style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:${color};background:${bg};padding:2px 9px;border-radius:4px">${val}</span>`;
+    return`<tr id="ent-row-${r.id}" ${sel?'style="background:#fff3cd"':''}>
+      <td style="text-align:center;padding:8px"><input type="checkbox" ${sel?'checked':''} onchange="toggleEntSel('${r.id}')" style="cursor:pointer;width:15px;height:15px"/></td>
+      <td style="font-weight:600;color:var(--charcoal)">${isE?`<input id="ent-co" value="${esc(r.compagnie||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.compagnie||'—')}</td>
+      <td>${isE?`<input id="ent-ville" value="${esc(r.ville||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.ville||'—')}</td>
+      <td>${isE?`<input id="ent-tel" value="${esc(r.telephone||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.telephone||'—')}</td>
+      <td>${isE?`<input id="ent-email" value="${esc(r.email||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.email||'—')}</td>
+      <td style="text-align:center">${hpBadge(r.hp_cumules,'#b45309','#fffbeb')}</td>
+      <td style="text-align:center">${isE?`<input type="number" id="ent-hp-utilises" value="${r.hp_utilises}" min="0" style="width:70px;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:.83rem;text-align:center"/>`:hpBadge(r.hp_utilises,'#dc2626','#fef2f2')}</td>
+      <td style="text-align:center">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:center">
+          ${hpBadge(r.hp_restants,r.hp_restants>=5?'var(--green-dark)':'#92400e',r.hp_restants>=5?'#f0fdf4':'#fffbeb')}
+          ${r.hp_restants>=10?'<span title="Éligible cadeau 🎁" style="font-size:.8rem">🎁</span>':r.hp_restants>=5?'<span title="Éligible crédit 💵" style="font-size:.8rem">💵</span>':''}
+        </div>
+      </td>
+      <td class="td-actions">
+        ${isE
+          ?`<button class="row-btn save-btn" onclick="saveEntreprise('${r.id}','${r._hpId||''}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="cancelEditEnt()">✕</button>`
+          :`<button class="row-btn edit-btn" onclick="startEditEnt('${r.id}')">✎</button><button class="row-btn del-btn" onclick="deleteEntreprise('${r.id}')">🗑</button>`}
+      </td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
+
+  main.innerHTML=`
+    <div class="page-header">
+      <div><div class="page-title">🏢 Entreprises &amp; Hydro-Prime</div>
+      <div class="page-sub">${rows.length} entreprise${rows.length!==1?'s':''} — 1 installation = 1 HP | 5 HP = crédit 💵 | 10 HP = cadeau 🎁</div></div>
+      <div class="page-actions" id="ent-page-actions"></div>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--mist);margin-bottom:18px;background:#fff;border-radius:6px 6px 0 0;padding:0 6px;box-shadow:var(--sh);flex-wrap:wrap">
+      <button onclick="usersFilter='actif';renderUsers()"      style="${tabStyle(false,'var(--green-dark)')}">Actifs <span style="${pillStyle(false,'var(--green-dark)','var(--green-pale)')}"> ${actifCount}</span></button>
+      <button onclick="usersFilter='inactif';renderUsers()"    style="${tabStyle(false,'var(--err)')}">Inactifs <span style="${pillStyle(false,'var(--err)','var(--err-l)')}"> ${inactifCount}</span></button>
+      <button onclick="usersFilter='tous';renderUsers()"       style="${tabStyle(false,'var(--blue)')}">Tous <span style="${pillStyle(false,'var(--blue)','var(--blue-pale)')}"> ${tousCount}</span></button>
+      <div style="width:1px;background:var(--mist);margin:8px 6px;align-self:stretch"></div>
+      <button onclick="usersFilter='entreprise';renderUsers()" style="${tabStyle(true,'#b45309')}">🏢 Entreprises / HP <span style="${pillStyle(true,'#b45309','#fef3c7')}"> ${rows.length}</span></button>
+    </div>
+    ${hasSelEnt?`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff3e0;border:1px solid #f59e0b;border-radius:6px;margin-bottom:12px">
+      <span style="font-family:var(--cond);font-size:.85rem;font-weight:700;color:#b45309">${selectedEntreprises.size} sélectionnée${selectedEntreprises.size>1?'s':''}</span>
+      <button onclick="deleteSelectedEntreprises()" class="btn btn-danger btn-sm">🗑 Supprimer la sélection</button>
+      <button onclick="selectedEntreprises.clear();renderEntreprisesTable()" class="btn btn-secondary btn-sm">Désélectionner</button>
+    </div>`:''}
+    <div class="tbl-card">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th style="width:36px"><input type="checkbox" ${allChecked?'checked':''} onchange="toggleAllEnt(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>
+            <th>Compagnie</th><th>Ville</th><th>Téléphone</th><th>Courriel</th>
+            <th style="text-align:center;background:#fffbeb;color:#b45309">HP Cumulés</th>
+            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés ✎</th>
+            <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">HP Restants</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>${tblRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  const actions=document.getElementById('ent-page-actions');
+  if(!actions)return;
+  const mkB=(cls,label,icon,fn,extra)=>{const b=document.createElement('button');b.className='btn '+cls;if(extra)b.style.cssText=extra;b.innerHTML=icon+label;b.addEventListener('click',fn);actions.appendChild(b);};
+  const iAdd='<svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+  const iXls='<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>';
+  const iDl ='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+  const iUp ='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
+  mkB('btn-primary',  'Ajouter',       iAdd, ()=>showUserForm('add'));
+  mkB('btn-blue',     'Export XLSX',   iXls, ()=>exportEntreprisesXLSX(),'background:#217346;border-color:#217346');
+  mkB('btn-secondary','Gabarit XLSX',  iDl,  ()=>downloadEntreprisesGabarit());
+  mkB('btn-secondary','Importer XLSX', iUp,  ()=>openEntreprisesImport());
+}
+
+function toggleEntSel(id){if(selectedEntreprises.has(id))selectedEntreprises.delete(id);else selectedEntreprises.add(id);renderEntreprisesTable();}
+function toggleAllEnt(checked){const rows=allUsers.filter(u=>u.role==='entreprise');if(checked)rows.forEach(r=>selectedEntreprises.add(r.id));else selectedEntreprises.clear();renderEntreprisesTable();}
+function startEditEnt(id){editingId=id;editBuf={};renderEntreprisesTable();}
+function cancelEditEnt(){editingId=null;editBuf={};renderEntreprisesTable();}
+
+async function saveEntreprise(userId,hpId){
+  setSyncing(true);
+  try{
+    const co   =document.getElementById('ent-co')?.value.trim()||'';
+    const ville=document.getElementById('ent-ville')?.value.trim()||'';
+    const tel  =document.getElementById('ent-tel')?.value.trim()||'';
+    const email=document.getElementById('ent-email')?.value.trim()||'';
+    const hpUtil=parseInt(document.getElementById('ent-hp-utilises')?.value||'0')||0;
+    await FB.updateDoc(FB.doc(FB.db,'users',userId),{compagnie:co,ville,telephone:tel,email,updatedAt:FB.serverTimestamp()});
+    const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===co&&(r.statut||'').startsWith('Livré'));
+    const hpCum=livres.length;
+    const hpRest=hpCum-hpUtil;
+    if(hpId){
+      await FB.updateDoc(FB.doc(FB.db,'HydroPrime',hpId),{nom_entreprise:co,ville,telephone:tel,hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,updatedAt:FB.serverTimestamp()});
+    } else {
+      await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:co,ville,telephone:tel,hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
+    }
+    editingId=null;editBuf={};
+    toast('Entreprise mise à jour ✓');
+  }catch(e){toast('Erreur: '+e.message,'err')}
+  setSyncing(false);
+}
+
+function deleteEntreprise(id){
+  const u=allUsers.find(x=>x.id===id);if(!u)return;
+  confirm2(`Supprimer l'entreprise "${u.compagnie||'?'}" ?\nCette action est irréversible.`,async()=>{
+    setSyncing(true);
+    try{await FB.deleteDoc(FB.doc(FB.db,'users',id));toast('Entreprise supprimée','warn');}
+    catch(e){toast('Erreur: '+e.message,'err')}
+    setSyncing(false);
+  });
+}
+
+function deleteSelectedEntreprises(){
+  if(!selectedEntreprises.size)return;
+  confirm2(`Supprimer ${selectedEntreprises.size} entreprise${selectedEntreprises.size>1?'s':''} ?\nCette action est irréversible.`,async()=>{
+    setSyncing(true);let del=0,err=0;
+    for(const id of selectedEntreprises){try{await FB.deleteDoc(FB.doc(FB.db,'users',id));del++;}catch(e){err++;}}
+    selectedEntreprises.clear();
+    toast(`${del} supprimée${del>1?'s':''}${err?', '+err+' erreur(s)':''}  ✓`,'warn');
+    setSyncing(false);
+  });
+}
+
+function exportEntreprisesXLSX(){
+  loadXLSX(()=>{
+    const allHP=window.allHydroPrime||[];
+    const rows=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
+    const headers=['Compagnie','Ville','Téléphone','Courriel','HP Cumulés','HP Utilisés','HP Restants'];
+    const data=rows.map(u=>{
+      const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
+      return[u.compagnie||'',u.ville||'',u.telephone||'',u.email||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0];
+    });
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:14},{wch:14}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
+    XLSX.utils.book_append_sheet(wb,ws,'Entreprises HP');
+    XLSX.writeFile(wb,'HK-Entreprises-HP_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
+}
+
+function downloadEntreprisesGabarit(){
+  loadXLSX(()=>{
+    const headers=['Compagnie','Ville','Téléphone','Courriel','HP Utilisés'];
+    const example=[['Excavation Martin inc.','Lévis','418-555-0101','martin@excavation.ca','0'],['Béton Lavoie','Québec','418-555-0202','lavoie@beton.ca','5']];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
+    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
+    const wsNote=XLSX.utils.aoa_to_sheet([
+      ['INSTRUCTIONS'],[''],
+      ['Champ','Description','Obligatoire ?'],
+      ['Compagnie','Nom exact de l\'entreprise','Oui'],
+      ['Ville','Ville','Non'],['Téléphone','Numéro','Non'],['Courriel','Adresse courriel','Non'],
+      ['HP Utilisés','HP déjà convertis (crédit ou cadeau)','Non — défaut 0'],[''],
+      ['ℹ HP Cumulés','Calculé auto : nombre d\'installations livrées',''],
+      ['ℹ HP Restants','Calculé auto : Cumulés − Utilisés',''],
+      ['ℹ Règles','5 HP min. crédit (1 HP = 100 $) | 10 HP min. cadeau (~2 000 $)',''],
+    ]);
+    wsNote['!cols']=[{wch:22},{wch:60},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws,'Gabarit');XLSX.utils.book_append_sheet(wb,wsNote,'Instructions');
+    XLSX.writeFile(wb,'HK-Gabarit-Entreprises-HP.xlsx');
+    toast('Gabarit téléchargé ✓');
+  });
+}
+
+function openEntreprisesImport(){window._entImportMode=true;openUsersImport();}
+
 
 function showUserForm(mode,id){userFormMode=mode;userFormId=id||null;renderUsers();renderUserForm();setTimeout(()=>{const a=document.getElementById('uform-area');if(a)a.scrollIntoView({behavior:'smooth',block:'start'})},50)}
 
