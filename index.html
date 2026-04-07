@@ -915,15 +915,15 @@ function setupApp(){
       </button>`;
   } else {
     const navLabel = session.role==='assembleur' ? 'Mes assemblages' : session.role==='distributeur' ? 'Mes livraisons' : 'Mon tableau';
-    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${session.role==='assembleur'?'dashboard':'tableau'}',this)">
+    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${(session.role==='assembleur'||session.role==='distributeur')?'dashboard':'tableau'}',this)">
       <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>${navLabel}
     </button>`;
   }
 
-  currentPanel = session.role==='assembleur' ? 'dashboard' : 'tableau';
+  currentPanel = (session.role==='assembleur'||session.role==='distributeur') ? 'dashboard' : 'tableau';
   startListeners();
-  // Force immediate render for assembleur even before snapshot arrives
-  if(session.role==='assembleur'){
+  // Force immediate render for assembleur/distributeur even before snapshot arrives
+  if(session.role==='assembleur'||session.role==='distributeur'){
     renderDashboard();
   }
 }
@@ -1023,24 +1023,42 @@ let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 
 function renderDashboard(){
   if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre') { renderTableauFiltered(); return; }
-  const rows = getRows();
-  // Stock = Fabriqué SANS avis d'installation attaché
-  const stock  = rows.filter(r=>r.statut==='Fabriqué');
-  // Avis = statut Avis d'installation AVEC numéro de série HK
-  const avis   = rows.filter(r=>r.statut==="Avis d'installation" && r.no_serie_hk);
-  // Mes avis à traiter = assembleur_attribue correspond + PAS de numéro de série HK dans AvisInstal
-  const allAvis = window.allAvisInstal||[];
-  const avisMe = allAvis.filter(r=>
-    (r.assembleur_attribue||'')===(session.compagnie||'') &&
-    !r.no_serie_hk
+
+  const isDist = session.role==='distributeur';
+  const allMyRows = allRecords.filter(r=>
+    isDist
+      ? (r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie)
+      : r.nom_assembleur===session.compagnie
   );
-  const livre  = rows.filter(r=>r.statut==='Livré vers distributeur'||r.statut==='Livré vers entreprise');
+
+  const stock  = allMyRows.filter(r=>r.statut==='Fabriqué');
+  const avis   = allMyRows.filter(r=>r.statut==="Avis d'installation" && r.no_serie_hk);
+  const livre  = allMyRows.filter(r=>r.statut==='Livré vers distributeur'||r.statut==='Livré vers entreprise');
+
+  const allAvisData = window.allAvisInstal||[];
+  const avisMe = isDist
+    ? allAvisData.filter(r=> !r.no_serie_hk && (
+        (r.distributeur_hk||'')===(session.compagnie||'') ||
+        (r.assembleur_attribue||'')===(session.compagnie||'')
+      ))
+    : allAvisData.filter(r=>
+        (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
+      );
 
   function byProduit(list){
     const map={};
     list.forEach(r=>{const p=r.produit_principal||'Non défini';map[p]=(map[p]||0)+1;});
     return Object.entries(map).sort((a,b)=>b[1]-a[1]);
   }
+  function byAssembleur(list){
+    const map={};
+    list.forEach(r=>{const p=r.nom_assembleur||r.assembleur_dist||'Non défini';map[p]=(map[p]||0)+1;});
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  }
+  const groupFn    = isDist ? byAssembleur : byProduit;
+  const groupLabel = isDist ? 'Par assembleur' : 'Par produit principal';
+  const barColor1  = isDist ? '#1b5fa8' : 'var(--green)';
+
   function barsHtml(entries,color){
     if(!entries.length) return '<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucune donnée</div>';
     const max=entries[0][1];
@@ -1056,7 +1074,6 @@ function renderDashboard(){
       </div>`).join('');
   }
 
-  // Stats livraisons
   const now=new Date(); const y=now.getFullYear(), m=now.getMonth();
   function parseDate(s){if(!s)return null;const d=new Date(s);return isNaN(d)?null:d;}
   const livreMois  = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d.getFullYear()===y&&d.getMonth()===m;});
@@ -1064,69 +1081,70 @@ function renderDashboard(){
   const sixMoisAgo=new Date(now);sixMoisAgo.setMonth(sixMoisAgo.getMonth()-6);
   const livreS6    = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);return d&&d>=sixMoisAgo;});
   const plusAn     = livre.filter(r=>{const d=parseDate(r.date_livraison||r.date_livraison_dist||r.recu_le);const c=new Date(now);c.setFullYear(c.getFullYear()-1);return d&&d<c;});
-  const nomMois=now.toLocaleDateString('fr-CA',{month:'long',year:'numeric'});
 
-  // Stat box cliquable pour livrés
   const statBox=(label,val,color,filter)=>`
     <div onclick="asmView='livre';asmLivreFilter='${filter}';renderDashboard()" style="background:${color}10;border:1px solid ${color}30;border-radius:6px;padding:14px 16px;text-align:center;cursor:pointer;transition:transform .15s" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform=''">
       <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:${color}">${val}</div>
       <div style="font-size:.75rem;color:var(--slate);margin-top:2px;line-height:1.3">${label}</div>
     </div>`;
 
-  const prodStock=byProduit(stock);
-  const prodAvis=byProduit(avis);
+  const prodStock=groupFn(stock);
+  const prodAvis=groupFn(avis);
 
-  // Liste des avis attribués à cet assembleur (card preview)
   const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>{
-    // Identifier à afficher : entreprise installateur si direct, sinon distributeur, sinon client
     const label = r.nom_entreprise_install || r.distributeur_hk || ((r.prenom_client||'')+' '+(r.nom_client||'')).trim() || '—';
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
       <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label)}</span>
       <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600;white-space:nowrap">${esc(r.produit_principal||'—')}</span>
     </div>`;
   }).join('')+(avisMe.length>6?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-6} autre${avisMe.length-6>1?'s':''}</div>`:'')
-    :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis à traiter</div>';
+    :`<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis en cours</div>`;
+
+  const titlePage        = isDist ? `Mes livraisons — ${esc(session.compagnie||'')}` : `Mes assemblages — ${esc(session.compagnie||'')}`;
+  const cardStock1Title  = isDist ? '📦 Stock disponible' : '🔧 Stock — Fabriqués';
+  const cardStock1Sub    = isDist ? 'Assemblages fabriqués disponibles' : "Prêts à être livrés (sans avis d'installation attribué)";
+  const cardAvisSub      = 'Avec numéro de série HK attribué';
+  const cardTraiterTitle = isDist ? '📌 Avis en cours' : "📌 Avis d'installation à traiter";
+  const cardTraiterSub   = isDist
+    ? `Associés à ${esc(session.compagnie||'')} — Informatif`
+    : `Assignés à ${esc(session.compagnie||'')} — Numéros de série à attribuer`;
+  const cardTraiterColor = isDist ? '#0e7490' : '#0891b2';
+  const cardTraiterBtn   = isDist ? 'Voir les avis →' : 'Voir le tableau →';
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div>
-        <div class="page-title">Mes assemblages — ${esc(session.compagnie||'')}</div>
-        <div class="page-sub">${rows.length} enregistrement${rows.length!==1?'s':''} au total</div>
+        <div class="page-title">${titlePage}</div>
+        <div class="page-sub">${allMyRows.length} enregistrement${allMyRows.length!==1?'s':''} au total</div>
       </div>
     </div>
-
-    <!-- RANGÉE 1 : Stock + Avis globaux (50/50) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-
-      <!-- CARTE 1 : STOCK -->
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🔧 Stock — Fabriqués</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Prêts à être livrés (sans avis d'installation attribué)</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">${cardStock1Title}</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardStock1Sub}</div>
           </div>
           <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green)">${stock.length}</div>
         </div>
         <div style="padding:14px 20px 8px">
-          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Par produit principal</div>
-          ${barsHtml(prodStock,'var(--green)')}
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
+          ${barsHtml(prodStock,barColor1)}
         </div>
         <div style="padding:8px 20px 14px">
           <button onclick="asmView='stock';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
-
-      <!-- CARTE 2 : AVIS GLOBAUX -->
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--blue);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Avis d'installation</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Avec numéro de série HK attribué</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardAvisSub}</div>
           </div>
           <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--blue)">${avis.length}</div>
         </div>
         <div style="padding:14px 20px 8px">
-          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Par produit principal</div>
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
           ${barsHtml(prodAvis,'var(--blue)')}
         </div>
         <div style="padding:8px 20px 14px">
@@ -1134,28 +1152,20 @@ function renderDashboard(){
         </div>
       </div>
     </div>
-
-    <!-- RANGÉE 2 : Mes avis attribués (1/4) + Livrés (3/4) -->
     <div style="display:grid;grid-template-columns:1fr 3fr;gap:16px">
-
-      <!-- CARTE 3 : MES AVIS ATTRIBUÉS -->
-      <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+      <div style="background:#fff;border-radius:8px;border-left:5px solid ${cardTraiterColor};box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
-            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📌 Avis d'installation à traiter</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Assignés à ${esc(session.compagnie||'')} — Numéros de série à attribuer</div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">${cardTraiterTitle}</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardTraiterSub}</div>
           </div>
-          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#0891b2">${avisMe.length}</div>
+          <div style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:${cardTraiterColor}">${avisMe.length}</div>
         </div>
-        <div style="padding:14px 20px 8px;max-height:260px;overflow-y:auto">
-          ${avisRows}
-        </div>
+        <div style="padding:14px 20px 8px;max-height:260px;overflow-y:auto">${avisRows}</div>
         <div style="padding:8px 20px 14px">
-          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid #0891b2;background:transparent;color:#0891b2;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid ${cardTraiterColor};background:transparent;color:${cardTraiterColor};font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">${cardTraiterBtn}</button>
         </div>
       </div>
-
-      <!-- CARTE 4 : LIVRÉS -->
       <div style="background:#fff;border-radius:8px;border-left:5px solid #7c3aed;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
@@ -1179,6 +1189,7 @@ function renderDashboard(){
       </div>
     </div>`;
 }
+
 
 function renderTableauFiltered(){
   const statutMap={
@@ -1219,29 +1230,41 @@ function renderTableauFiltered(){
   }
   const allCols=getCols();
 
-  // VUE "Avis d'installation à traiter" — AvisInstal assignés à cet assembleur, sans N° HK
+  // VUE "Avis d'installation à traiter/en cours" — AvisInstal sans N° HK
   if(asmView==='avis'){
-    const allAvis = (window.allAvisInstal||[]).filter(r=>
-      (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
-    );
-    const hkDispo = getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort();
+    const isDist = session.role==='distributeur';
+    const allAvis = (window.allAvisInstal||[]).filter(r=>{
+      if(isDist) return !r.no_serie_hk && (
+        (r.distributeur_hk||'')===(session.compagnie||'') ||
+        (r.assembleur_attribue||'')===(session.compagnie||'')
+      );
+      return (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk;
+    });
+    const hkDispo = !isDist ? getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort() : [];
 
-    // Toutes les colonnes AI_COLS + colonne attribution HK en premier
-    const thAvis=`<th style="min-width:180px;background:#b45309;color:#fff">Attribuer N° HK</th>`
-      +AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
+    // Pour assembleur : colonne attribution + toutes colonnes | Pour distributeur : lecture seule toutes colonnes
+    const thAvis = (!isDist ? `<th style="min-width:180px;background:#b45309;color:#fff">Attribuer N° HK</th>` : '')
+      + AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
 
     const trAvis=allAvis.length ? allAvis.map(r=>{
-      const opts='<option value="">— Choisir —</option>'+hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('');
-      const hkCell=`<td style="min-width:180px;background:#fef3c7"><select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">${opts}</select></td>`;
       const dataCells=AI_COLS.map(c=>{
         const v=r[c.k];
         if(c.t==='bool') return`<td style="text-align:center">${v?'✅':'—'}</td>`;
         if(c.t==='multi'){const vals=Array.isArray(v)?v:(v?[v]:[]);return`<td>${vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—'}</td>`;}
         return`<td>${esc(v||'—')}</td>`;
       }).join('');
+      if(isDist) return`<tr>${dataCells}</tr>`;
+      const opts='<option value="">— Choisir —</option>'+hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('');
+      const hkCell=`<td style="min-width:180px;background:#fef3c7"><select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">${opts}</select></td>`;
       return`<tr>${hkCell}${dataCells}</tr>`;
     }).join('')
-    :`<tr><td colspan="${AI_COLS.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis à traiter</p></div></td></tr>`;
+    :`<tr><td colspan="${AI_COLS.length+(isDist?0:1)}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>${isDist?'Aucun avis en cours':'Aucun avis à traiter'}</p></div></td></tr>`;
+
+    const pageTitle = isDist ? "📌 Avis en cours" : "📌 Avis d'installation à traiter";
+    const pageSub   = isDist
+      ? `${allAvis.length} avis — Lecture seule`
+      : `${allAvis.length} avis — N° de série à attribuer`;
+    const pageColor = isDist ? '#0e7490' : '#0891b2';
 
     document.getElementById('app-main').innerHTML=`
       <div class="page-header">
@@ -1250,8 +1273,8 @@ function renderTableauFiltered(){
             <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
           </button>
           <div>
-            <div class="page-title">📌 Avis d'installation à traiter</div>
-            <div class="page-sub" style="color:#0891b2">${allAvis.length} avis — N° de série à attribuer</div>
+            <div class="page-title">${pageTitle}</div>
+            <div class="page-sub" style="color:${pageColor}">${pageSub}</div>
           </div>
         </div>
       </div>
@@ -1268,9 +1291,14 @@ function renderTableauFiltered(){
 
   // VUE "Avis d'installation" (carte bleue) — AvisInstal avec N° HK, lecture seule, toutes colonnes
   if(asmView==='avisWith'){
-    const allAvisHk = (window.allAvisInstal||[]).filter(r=>
-      (r.assembleur_attribue||'')===(session.compagnie||'') && !!r.no_serie_hk
-    );
+    const isDist2 = session.role==='distributeur';
+    const allAvisHk = (window.allAvisInstal||[]).filter(r=>{
+      if(isDist2) return !!r.no_serie_hk && (
+        (r.distributeur_hk||'')===(session.compagnie||'') ||
+        (r.assembleur_attribue||'')===(session.compagnie||'')
+      );
+      return (r.assembleur_attribue||'')===(session.compagnie||'') && !!r.no_serie_hk;
+    });
 
     const thAvH=AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
     const trAvH=allAvisHk.length ? allAvisHk.map(r=>{
@@ -1390,22 +1418,22 @@ const COLS_ASM=[
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_DIST=[
-  {k:'po_assembleur',        l:'#PO Assembleur'},
-  {k:'po_norweco',           l:'#PO Norweco'},
-  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
-  {k:'produit_principal',    l:'Produit Principal'},
+  {k:'no_serie_hk',          l:'N° Série HK',                               hk:true, ro:true},
+  {k:'produit_principal',    l:'Produit Principal',                          ro:true},
   {k:'produit2',             l:'Produit #2'},
   {k:'produit3',             l:'Produit #3'},
-  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
-  {k:'nom_installateur',     l:'Installateur autorisé'},
-  {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
-  {k:'date_livraison_dist',  l:'Date livraison distributeur', t:'date'},
+  {k:'conseiller',           l:'Conseiller',                                 ro:true},
+  {k:'nom_entrepreneur',     l:"Nom de l'entrepreneur"},
+  {k:'nom_installateur',     l:'Installateur autorisé',                      ro:true},
+  {k:'date_livraison',       l:'Date livraison assembleur',    t:'date',     ro:true},
+  {k:'nom_distributeur',     l:'Nom du distributeur',                        ro:true},
+  {k:'date_livraison_dist',  l:'Date livraison distributeur',  t:'date'},
   {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'assembleur_dist',      l:'Assembleur/Distributeur',                    ro:true},
+  {k:'identification_site',  l:"Identification du site d'installation",      ro:true},
   {k:'notes_distributeur',   l:'Notes distributeur'},
-  {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
-  {k:'identification_site',  l:"Identification du site d'installation"},
-  {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
+  {k:'statut',               l:'Statut',                       t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
   {k:'no_serie_hk',          l:'N° Série HK', hk:true},
