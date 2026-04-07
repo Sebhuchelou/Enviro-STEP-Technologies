@@ -1022,7 +1022,7 @@ let asmView = null;
 let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 
 function renderDashboard(){
-  if(asmView) { renderTableauFiltered(); return; }
+  if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre') { renderTableauFiltered(); return; }
   const rows = getRows();
   // Stock = Fabriqué SANS avis d'installation attaché
   const stock  = rows.filter(r=>r.statut==='Fabriqué');
@@ -1077,11 +1077,14 @@ function renderDashboard(){
   const prodAvis=byProduit(avis);
 
   // Liste des avis attribués à cet assembleur (card preview)
-  const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
-      <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((r.prenom_client||'')+' '+(r.nom_client||''))}, ${esc(r.ville_site||'')}</span>
+  const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>{
+    // Identifier à afficher : entreprise installateur si direct, sinon distributeur, sinon client
+    const label = r.nom_entreprise_install || r.distributeur_hk || ((r.prenom_client||'')+' '+(r.nom_client||'')).trim() || '—';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+      <span style="font-size:.75rem;color:var(--slate);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label)}</span>
       <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600;white-space:nowrap">${esc(r.produit_principal||'—')}</span>
-    </div>`).join('')+(avisMe.length>6?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-6} autre${avisMe.length-6>1?'s':''}</div>`:'')
+    </div>`;
+  }).join('')+(avisMe.length>6?`<div style="font-size:.74rem;color:var(--slate);padding:6px 0;text-align:center">… et ${avisMe.length-6} autre${avisMe.length-6>1?'s':''}</div>`:'')
     :'<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis à traiter</div>';
 
   document.getElementById('app-main').innerHTML=`
@@ -1127,7 +1130,7 @@ function renderDashboard(){
           ${barsHtml(prodAvis,'var(--blue)')}
         </div>
         <div style="padding:8px 20px 14px">
-          <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--blue);background:transparent;color:var(--blue);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+          <button onclick="asmView='avisWith';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--blue);background:transparent;color:var(--blue);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
     </div>
@@ -1216,27 +1219,29 @@ function renderTableauFiltered(){
   }
   const allCols=getCols();
 
-  // Vue spéciale pour "Avis d'installation à traiter" — affiche AvisInstal sans N° HK
+  // VUE "Avis d'installation à traiter" — AvisInstal assignés à cet assembleur, sans N° HK
   if(asmView==='avis'){
     const allAvis = (window.allAvisInstal||[]).filter(r=>
       (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
     );
     const hkDispo = getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort();
 
-    const avisColsLabels=['Client','Ville','Produit principal','Date installation','Installateur','Attribuer N° HK'];
-    const thAvis=avisColsLabels.map(l=>`<th>${l}</th>`).join('');
+    // Toutes les colonnes AI_COLS + colonne attribution HK en premier
+    const thAvis=`<th style="min-width:180px;background:#b45309;color:#fff">Attribuer N° HK</th>`
+      +AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
+
     const trAvis=allAvis.length ? allAvis.map(r=>{
       const opts='<option value="">— Choisir —</option>'+hkDispo.map(hk=>'<option value="'+esc(hk)+'">'+esc(hk)+'</option>').join('');
-      return`<tr>
-        <td>${esc((r.prenom_client||'')+' '+(r.nom_client||''))}</td>
-        <td>${esc(r.ville_site||'—')}</td>
-        <td>${esc(r.produit_principal||'—')}</td>
-        <td style="white-space:nowrap">${esc(r.date_installation||'—')}</td>
-        <td>${esc(r.nom_entreprise_install||'—')}</td>
-        <td style="min-width:180px"><select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">${opts}</select></td>
-      </tr>`;
+      const hkCell=`<td style="min-width:180px;background:#fef3c7"><select onchange="assignHkToAvis('${r.id}',this.value,this)" style="width:100%;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:11px;background:#fef9ee;color:#92400e;font-weight:600">${opts}</select></td>`;
+      const dataCells=AI_COLS.map(c=>{
+        const v=r[c.k];
+        if(c.t==='bool') return`<td style="text-align:center">${v?'✅':'—'}</td>`;
+        if(c.t==='multi'){const vals=Array.isArray(v)?v:(v?[v]:[]);return`<td>${vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—'}</td>`;}
+        return`<td>${esc(v||'—')}</td>`;
+      }).join('');
+      return`<tr>${hkCell}${dataCells}</tr>`;
     }).join('')
-    :`<tr><td colspan="6"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis à traiter</p></div></td></tr>`;
+    :`<tr><td colspan="${AI_COLS.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis à traiter</p></div></td></tr>`;
 
     document.getElementById('app-main').innerHTML=`
       <div class="page-header">
@@ -1255,6 +1260,48 @@ function renderTableauFiltered(){
           <table>
             <thead><tr>${thAvis}</tr></thead>
             <tbody>${trAvis}</tbody>
+          </table>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // VUE "Avis d'installation" (carte bleue) — AvisInstal avec N° HK, lecture seule, toutes colonnes
+  if(asmView==='avisWith'){
+    const allAvisHk = (window.allAvisInstal||[]).filter(r=>
+      (r.assembleur_attribue||'')===(session.compagnie||'') && !!r.no_serie_hk
+    );
+
+    const thAvH=AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
+    const trAvH=allAvisHk.length ? allAvisHk.map(r=>{
+      const cells=AI_COLS.map(c=>{
+        const v=r[c.k];
+        if(c.t==='bool') return`<td style="text-align:center">${v?'✅':'—'}</td>`;
+        if(c.t==='multi'){const vals=Array.isArray(v)?v:(v?[v]:[]);return`<td>${vals.length?vals.map(x=>'<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;font-size:10px;background:var(--blue-pale);color:var(--blue-dark)">'+esc(x)+'</span>').join(''):'—'}</td>`;}
+        if(c.k==='no_serie_hk')return`<td class="hk">${esc(v||'—')}</td>`;
+        return`<td>${esc(v||'—')}</td>`;
+      }).join('');
+      return`<tr>${cells}</tr>`;
+    }).join('')
+    :`<tr><td colspan="${AI_COLS.length}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis avec N° HK</p></div></td></tr>`;
+
+    document.getElementById('app-main').innerHTML=`
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onclick="asmView=null;renderDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
+          </button>
+          <div>
+            <div class="page-title">📋 Avis d'installation</div>
+            <div class="page-sub" style="color:var(--blue)">${allAvisHk.length} avis — Lecture seule</div>
+          </div>
+        </div>
+      </div>
+      <div class="tbl-card">
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr>${thAvH}</tr></thead>
+            <tbody>${trAvH}</tbody>
           </table>
         </div>
       </div>`;
