@@ -613,6 +613,9 @@ tbody tr:hover{background:#f8fbf5;}
 </div>
 
 <!-- ═══════════════════ CONFIRM MODAL ══════════════════════ -->
+<!-- ═══════════ ATTRIBUTION OVERLAY ═══════════ -->
+<div id="attr-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px"></div>
+
 <div class="overlay" id="confirm-overlay">
   <div class="confirm-box">
     <div class="confirm-icon"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
@@ -1174,7 +1177,8 @@ function renderDashboard(){
       </div>
     </div>
 
-    <!-- RANGÉE 1 : Stock + Avis globaux (50/50) -->
+    <!-- RANGÉE 1 (assembleur) : Stock pleine largeur OU dist : Stock + Avis 50/50 -->
+    ${isDist ? `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
@@ -1208,8 +1212,53 @@ function renderDashboard(){
           <button onclick="asmView='avisWith';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--blue);background:transparent;color:var(--blue);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
         </div>
       </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 3fr;gap:16px">
+    </div>` : `
+    <!-- Assembleur : Stock pleine largeur + Avis traiter comme carte principale -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <!-- Stock -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">${cardStock1Title}</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${cardStock1Sub}</div>
+          </div>
+          <div onclick="asmView='stock';renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:var(--green);cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='var(--green-pale)'" onmouseout="this.style.background=''">${stock.length}</div>
+        </div>
+        <div style="padding:14px 20px 8px">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">${groupLabel}</div>
+          ${barsHtml(prodStock,barColor1)}
+        </div>
+        <div style="padding:8px 20px 14px">
+          <button onclick="asmView='stock';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+        </div>
+      </div>
+      <!-- Avis à traiter — boutons produits -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📌 Avis d'installation à traiter</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Cliquer sur un produit pour attribuer un N° HK</div>
+          </div>
+          <div onclick="asmView='avis';renderDashboard()" style="font-family:var(--cond);font-size:2.2rem;font-weight:800;color:#0891b2;cursor:pointer;border-radius:6px;padding:2px 8px;transition:background .15s" onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background=''">${avisMe.length}</div>
+        </div>
+        <div style="padding:14px 20px">
+          ${(()=>{
+            // Grouper avisMe par produit_principal
+            const byProd={};
+            avisMe.forEach(r=>{const p=r.produit_principal||'Non défini';if(!byProd[p])byProd[p]=[];byProd[p].push(r);});
+            const entries=Object.entries(byProd).sort((a,b)=>b[1].length-a[1].length);
+            if(!entries.length) return'<div style="color:var(--slate);font-size:.8rem">Aucun avis à traiter</div>';
+            return entries.map(([prod,list])=>`
+              <button onclick="openAvisAttributionModal('${esc(prod).replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 14px;margin-bottom:8px;border-radius:6px;border:2px solid #0891b2;background:#f0f9ff;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background='#f0f9ff'">
+                <span style="font-family:var(--cond);font-size:.85rem;font-weight:700;color:var(--charcoal)">${esc(prod)}</span>
+                <span style="font-family:var(--cond);font-size:.9rem;font-weight:800;color:#0891b2;background:#fff;border-radius:4px;padding:2px 9px;border:1px solid #0891b2">${list.length}</span>
+              </button>`).join('');
+          })()}
+        </div>
+      </div>
+    </div>`}
+    <div style="display:grid;grid-template-columns:${isDist?'1fr 3fr':'1fr'};gap:16px">
+      ${isDist ? `
       <div style="background:#fff;border-radius:8px;border-left:5px solid ${cardTraiterColor};box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
@@ -1222,7 +1271,7 @@ function renderDashboard(){
         <div style="padding:8px 20px 14px">
           <button onclick="asmView='avis';renderDashboard()" style="width:100%;padding:7px;border-radius:var(--r);border:2px solid ${cardTraiterColor};background:transparent;color:${cardTraiterColor};font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">${cardTraiterBtn}</button>
         </div>
-      </div>
+      </div>` : ''}
       <div style="background:#fff;border-radius:8px;border-left:5px solid #7c3aed;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
         <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
@@ -1669,6 +1718,268 @@ async function initMap(container,installs,assembleurs,distributeurs){
       await new Promise(r=>setTimeout(r,1200));
     }
   }
+}
+
+// ════════════════════════════════════════════════════════
+// MODAL ATTRIBUTION AVIS — 2 ÉTAPES (assembleur)
+// ════════════════════════════════════════════════════════
+let _attrAvisId   = null; // avis sélectionné étape 1
+let _attrRecordId = null; // record HK sélectionné étape 2
+
+function openAvisAttributionModal(produitFilter){
+  // Récupérer les avis à traiter + les records fabriqués
+  const avisMe = (window.allAvisInstal||[]).filter(r=>
+    (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
+  );
+  const avisFiltered = produitFilter
+    ? avisMe.filter(r=>(r.produit_principal||'')===(produitFilter||''))
+    : avisMe;
+  const stockDispo = allRecords.filter(r=>
+    r.statut==='Fabriqué' && r.nom_assembleur===session.compagnie
+  );
+
+  // Liste des produits pour les filtres
+  const produits=[...new Set(avisMe.map(r=>r.produit_principal||'Non défini'))].sort();
+
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay) return;
+  _attrAvisId=null; _attrRecordId=null;
+
+  renderAttrStep1(overlay, avisFiltered, avisMe, produits, produitFilter, stockDispo);
+  overlay.style.display='flex';
+}
+
+function renderAttrStep1(overlay, avisFiltered, avisAll, produits, produitActif, stockDispo){
+  // Stocker pour réutilisation
+  overlay._avisAll = avisAll;
+  overlay._produits = produits;
+  overlay._stock = stockDispo;
+
+  const filtreBtns = [
+    `<button onclick="openAvisAttributionModal(null)" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--cond);cursor:pointer;border:2px solid ${!produitActif?'#0891b2':'var(--mist)'};background:${!produitActif?'#e0f2fe':'#fff'};color:${!produitActif?'#0891b2':'var(--slate)'}">Tous (${avisAll.length})</button>`,
+    ...produits.map(p=>{
+      const cnt=avisAll.filter(r=>(r.produit_principal||'Non défini')===p).length;
+      const active=produitActif===p;
+      const safeP=p.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<button onclick="openAvisAttributionModal('${safeP}')" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--cond);cursor:pointer;border:2px solid ${active?'#0891b2':'var(--mist)'};background:${active?'#e0f2fe':'#fff'};color:${active?'#0891b2':'var(--slate)'}">${esc(p)} (${cnt})</button>`;
+    })
+  ].join('');
+
+  const avisListHtml = avisFiltered.length ? avisFiltered.map(r=>`
+    <div id="attr-avis-${r.id}" onclick="selectAttrAvis('${r.id}')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;border:2px solid var(--mist);margin-bottom:8px;cursor:pointer;transition:all .15s">
+      <div style="width:18px;height:18px;border-radius:50%;border:2px solid #0891b2;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center" id="attr-radio-${r.id}"></div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:.85rem;color:var(--charcoal)">${esc(r.nom_entreprise_install||r.nom_entrepreneur||'—')}</div>
+        <div style="font-size:.75rem;color:var(--slate);margin-top:1px">${esc(r.ville_site||'')} — ${esc(r.produit_principal||'—')}</div>
+      </div>
+      <span style="font-size:.72rem;padding:2px 8px;border-radius:3px;background:var(--blue-pale);color:var(--blue);font-weight:600">${esc(r.date_installation||'—')}</span>
+    </div>`).join('')
+  : '<div style="text-align:center;padding:30px;color:var(--slate)">Aucun avis pour ce filtre</div>';
+
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:8px;width:100%;max-width:760px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid #0891b2">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#222">Étape 1 — Sélectionner un avis</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:2px">${avisAll.length} avis à traiter</div>
+        </div>
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+      </div>
+      <div style="padding:12px 24px;border-bottom:1px solid var(--mist);display:flex;gap:8px;flex-wrap:wrap;background:var(--cloud)">${filtreBtns}</div>
+      <div style="overflow-y:auto;flex:1;padding:12px 24px" id="attr-avis-list">${avisListHtml}</div>
+      <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+        <button id="attr-next-btn" onclick="openAttrStep2()" disabled style="padding:8px 18px;border-radius:var(--r);border:2px solid #0891b2;background:#0891b2;color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;opacity:.4">Suivant →</button>
+      </div>
+    </div>`;
+}
+
+
+function selectAttrAvis(id){
+  _attrAvisId=id;
+  // Visuellement sélectionner
+  document.querySelectorAll('[id^="attr-avis-"]').forEach(el=>{
+    const rid=el.id.replace('attr-avis-','');
+    el.style.borderColor=rid===id?'#0891b2':'var(--mist)';
+    el.style.background=rid===id?'#f0f9ff':'#fff';
+    const radio=document.getElementById('attr-radio-'+rid);
+    if(radio) radio.innerHTML=rid===id?'<div style="width:8px;height:8px;border-radius:50%;background:#0891b2"></div>':'';
+  });
+  const btn=document.getElementById('attr-next-btn');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+
+function openAttrStep2(){
+  if(!_attrAvisId) return;
+  const overlay=document.getElementById('attr-overlay');
+  const avis=(window.allAvisInstal||[]).find(r=>r.id===_attrAvisId);
+  if(!avis) return;
+
+  const stockDispo = overlay._stock || allRecords.filter(r=>r.statut==='Fabriqué'&&r.nom_assembleur===session.compagnie);
+
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:8px;width:100%;max-width:760px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--green)">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#222">Étape 2 — Sélectionner un N° HK et confirmer</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:2px">Avis : <strong>${esc(avis.nom_entreprise_install||avis.nom_entrepreneur||'—')}</strong> — ${esc(avis.produit_principal||'')}</div>
+        </div>
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding:16px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+        <!-- Colonne gauche : choisir le HK -->
+        <div>
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">N° Série HK disponibles (${stockDispo.length})</div>
+          <div style="max-height:300px;overflow-y:auto;border:1px solid var(--mist);border-radius:6px">
+            ${stockDispo.length?stockDispo.map(r=>`
+              <div id="hk-row-${r.id}" onclick="selectAttrHK('${r.id}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--mist);cursor:pointer;transition:background .1s" onmouseover="if(_attrRecordId!=='${r.id}')this.style.background='var(--green-pale)'" onmouseout="if(_attrRecordId!=='${r.id}')this.style.background=''">
+                <div id="hk-radio-${r.id}" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--green);background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center"></div>
+                <div>
+                  <div style="font-family:var(--cond);font-size:.88rem;font-weight:700;color:var(--charcoal)">${esc(r.no_serie_hk||'—')}</div>
+                  <div style="font-size:.72rem;color:var(--slate)">${esc(r.produit_principal||'—')}</div>
+                </div>
+              </div>`).join('')
+            :'<div style="padding:20px;text-align:center;color:var(--slate);font-size:.82rem">Aucun stock disponible</div>'}
+          </div>
+        </div>
+
+        <!-- Colonne droite : champs modifiables -->
+        <div>
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate);margin-bottom:10px">Informations à confirmer</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #2</label>
+              <input id="attr-produit2" value="${esc(avis.produit2||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #3</label>
+              <input id="attr-produit3" value="${esc(avis.produit3||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom de l'entrepreneur</label>
+              <input id="attr-entrepreneur" value="${esc(avis.nom_entreprise_install||avis.nom_entrepreneur||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Date de livraison assembleur</label>
+              <input type="date" id="attr-date-livraison" value="${esc(avis.date_installation||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Type client</label>
+              <select id="attr-type-client" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px">
+                <option value="Entrepreneur direct"${(avis.type_client||'')==='Entrepreneur direct'?' selected':''}>Entrepreneur direct</option>
+                <option value="Distributeur"${(avis.type_client||'')==='Distributeur'?' selected':''}>Distributeur</option>
+              </select></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Adresse du site</label>
+              <input id="attr-adresse" value="${esc(avis.no_civique_rue||avis.adresse_site||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Ville</label>
+              <input id="attr-ville" value="${esc(avis.ville_site||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Notes assembleur</label>
+              <input id="attr-notes" value="${esc(avis.note_distributeur||'')}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.84rem;margin-top:3px"/></div>
+            <div>
+              <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Statut *</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+                <button id="stat-dist" onclick="setAttrStatut('Livré vers distributeur')" style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🚚 Livré distributeur</button>
+                <button id="stat-ent"  onclick="setAttrStatut('Livré vers entreprise')"  style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🏢 Livré entreprise</button>
+                <button id="stat-ann"  onclick="setAttrStatut('Annulé')"                   style="padding:8px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;grid-column:1/-1;color:#dc2626">✕ Annuler</button>
+              </div>
+              <input type="hidden" id="attr-statut" value=""/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <button onclick="openAvisAttributionModal(null)" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">← Retour</button>
+        <div style="display:flex;gap:10px">
+          <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+          <button id="attr-save-btn" onclick="confirmAttribution()" disabled style="padding:8px 20px;border-radius:var(--r);border:2px solid var(--green);background:var(--green);color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;opacity:.4">💾 Enregistrer</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+let _attrStatut='';
+function setAttrStatut(s){
+  _attrStatut=s;
+  const ids={dist:'Livré vers distributeur',ent:'Livré vers entreprise',ann:'Annulé'};
+  Object.entries(ids).forEach(([sfx,val])=>{
+    const btn=document.getElementById('stat-'+sfx);
+    if(!btn)return;
+    const active=val===s;
+    btn.style.borderColor=active?(sfx==='ann'?'#dc2626':'var(--green)'):'var(--mist)';
+    btn.style.background=active?(sfx==='ann'?'#fee2e2':'var(--green-pale)'):'#fff';
+    btn.style.color=active?(sfx==='ann'?'#dc2626':'var(--green-dark)'):'var(--charcoal)';
+  });
+  const input=document.getElementById('attr-statut');
+  if(input) input.value=s;
+  checkAttrSaveBtn();
+}
+function selectAttrHK(id){
+  _attrRecordId=id;
+  document.querySelectorAll('[id^="hk-row-"]').forEach(el=>{
+    const rid=el.id.replace('hk-row-','');
+    el.style.background=rid===id?'var(--green-pale)':'';
+    const radio=document.getElementById('hk-radio-'+rid);
+    if(radio) radio.innerHTML=rid===id?'<div style="width:8px;height:8px;border-radius:50%;background:var(--green)"></div>':'';
+  });
+  checkAttrSaveBtn();
+}
+function checkAttrSaveBtn(){
+  const btn=document.getElementById('attr-save-btn');
+  if(!btn)return;
+  const ok=_attrRecordId&&_attrStatut;
+  btn.disabled=!ok; btn.style.opacity=ok?'1':'.4';
+}
+
+async function confirmAttribution(){
+  if(!_attrAvisId||!_attrRecordId||!_attrStatut) return;
+  const avis=(window.allAvisInstal||[]).find(r=>r.id===_attrAvisId);
+  const rec=allRecords.find(r=>r.id===_attrRecordId);
+  if(!avis||!rec){toast('Données introuvables','err');return;}
+
+  const btn=document.getElementById('attr-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
+  setSyncing(true);
+  try{
+    const hk=rec.no_serie_hk||'';
+    const produit2 =document.getElementById('attr-produit2')?.value||'';
+    const produit3 =document.getElementById('attr-produit3')?.value||'';
+    const entrepreneur=document.getElementById('attr-entrepreneur')?.value||'';
+    const dateLiv  =document.getElementById('attr-date-livraison')?.value||'';
+    const typeClient=document.getElementById('attr-type-client')?.value||'';
+    const adresse  =document.getElementById('attr-adresse')?.value||'';
+    const ville    =document.getElementById('attr-ville')?.value||'';
+    const notes    =document.getElementById('attr-notes')?.value||'';
+
+    // 1. Mettre à jour AvisInstal
+    await FB.updateDoc(FB.doc(FB.db,'AvisInstal',_attrAvisId),{
+      no_serie_hk: hk,
+      updatedAt: FB.serverTimestamp()
+    });
+
+    // 2. Mettre à jour le record
+    const updateData={
+      produit2, produit3,
+      nom_entrepreneur:   entrepreneur,
+      nom_installateur:   entrepreneur,
+      date_livraison:     dateLiv,
+      type_client:        typeClient,
+      adresse_site:       adresse,
+      ville_livraison:    ville,
+      notes_assembleur:   notes,
+      conseiller:         avis.conseiller_regional||rec.conseiller||'',
+      identification_site:avis.no_lot||rec.identification_site||'',
+      statut:             _attrStatut,
+      derniere_modif:     nowStr(),
+      dernier_utilisateur:session.email||session.nom||'',
+      updatedAt:          FB.serverTimestamp()
+    };
+    await FB.updateDoc(FB.doc(FB.db,'records',_attrRecordId), updateData);
+
+    // 3. Mettre à jour HydroPrime si livré
+    if(_attrStatut.startsWith('Livré')){
+      await updateHydroPrime(entrepreneur||rec.nom_entrepreneur||'');
+    }
+
+    document.getElementById('attr-overlay').style.display='none';
+    _attrAvisId=null; _attrRecordId=null; _attrStatut='';
+    toast('Attribution enregistrée — statut : '+_attrStatut+' ✓');
+  }catch(e){
+    toast('Erreur: '+e.message,'err');
+    if(btn){btn.disabled=false;btn.textContent='💾 Enregistrer';}
+  }
+  setSyncing(false);
 }
 
 function renderTableauFiltered(){
