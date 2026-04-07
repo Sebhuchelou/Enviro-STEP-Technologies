@@ -1261,6 +1261,11 @@ function renderTableauFiltered(){
     return;
   }
 
+  // Construction des lignes pour stock et livre
+  const tblRows=rows.length
+    ?rows.map(r=>rowHtml(r,allCols)).join('')
+    :`<tr><td colspan="${allCols.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
+
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px">
@@ -1272,17 +1277,11 @@ function renderTableauFiltered(){
           <div class="page-sub" style="color:${colorMap[asmView]}">${rows.length} enregistrement${rows.length!==1?'s':''}</div>
         </div>
       </div>
-      <div class="page-actions">
-        <button class="btn btn-blue" onclick="exportXLSX()" style="background:#217346;border-color:#217346">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Export XLSX
-        </button>
-      </div>
     </div>
     <div class="tbl-card">
       <div class="tbl-scroll">
         <table>
           <thead><tr>
-            ${asmView==='avis'?'<th style="white-space:nowrap">Avis</th>':''}
             ${allCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
             <th>Actions</th>
           </tr></thead>
