@@ -3575,6 +3575,9 @@ const UI_MAP = {
   'rôle':'role','role':'role',
   'entreprise':'entreprise','entreprises':'entreprise','entreprise (sans accès)':'entreprise',
   'mrc(s)':'mrcs','mrcs':'mrcs','mrc':'mrcs',
+  'assembleur par défaut':'assembleur_defaut','assembleur par defaut':'assembleur_defaut',
+  '2ième assembleur':'assembleur_2','2ieme assembleur':'assembleur_2','2e assembleur':'assembleur_2',
+  '3ième assembleur':'assembleur_3','3ieme assembleur':'assembleur_3','3e assembleur':'assembleur_3',
   'mot de passe (nouveau seulement)':'password',
   'mot de passe':'password','password':'password','mdp':'password',
 };
@@ -3593,7 +3596,14 @@ function uiBuildPreview(headers, rows){
     if(!rec.nom)     return { rec, row:i+2, status:'err', reason:'Nom manquant' };
 
     const dup = allUsers.find(u => (u.email||'').toLowerCase() === rec.email.toLowerCase());
-    if(dup) return { rec, row:i+2, status:'dup', reason:'Courriel déjà existant — doublon bloqué' };
+    if(dup){
+      // Doublon existant → mise à jour autorisée (pas bloqué)
+      if(rec.role) rec.role = rec.role.toLowerCase(); else rec.role = dup.role||'assembleur';
+      if(rec.mrcs) rec.mrcs = rec.mrcs.split(',').map(x=>x.trim()).filter(Boolean); else rec.mrcs = dup.mrcs||[];
+      // Conserver le mot de passe si fourni, sinon mettre un placeholder (ne sera pas utilisé)
+      if(!rec.password) rec.password = '________';
+      return { rec, row:i+2, status:'warn', reason:'Doublon — profil sera mis à jour', existingId: dup.id };
+    }
 
     // Entreprise : pas de compte Auth, mot de passe non requis
     if(rec.role === 'entreprise'){
@@ -3614,20 +3624,21 @@ function uiBuildPreview(headers, rows){
     return { rec, row:i+2, status: warn ? 'warn' : 'ok', reason: warn };
   }).filter(Boolean);
 
-  const ok   = uiParsed.filter(r=>r.status==='ok'||r.status==='warn').length;
-  const dup  = uiParsed.filter(r=>r.status==='dup').length;
-  const err  = uiParsed.filter(r=>r.status==='err').length;
-  const warn = uiParsed.filter(r=>r.status==='warn').length;
+  const ok     = uiParsed.filter(r=>r.status==='ok').length;
+  const update = uiParsed.filter(r=>r.status==='warn'&&r.existingId).length;
+  const warn   = uiParsed.filter(r=>r.status==='warn'&&!r.existingId).length;
+  const err    = uiParsed.filter(r=>r.status==='err').length;
+  const total_ok = ok + update + warn;
 
   const pill = (txt,bg,col) => '<span style="padding:4px 10px;border-radius:3px;font-size:11px;font-weight:700;font-family:var(--cond);background:'+bg+';color:'+col+'">'+txt+'</span>';
   document.getElementById('ui-summary').innerHTML =
-    (ok   ? pill('✓ '+ok+' prêt'+(ok>1?'s':'')+' à importer','#e8f5e9','#2e7d32') : '') +
-    (dup  ? pill('⊘ '+dup+' doublon'+(dup>1?'s':'')+' bloqué'+(dup>1?'s':''),'#fff3e0','#e65100') : '') +
-    (warn ? pill('⚠ '+warn+' avertissement'+(warn>1?'s':''),'#e3f2fd','#1565c0') : '') +
-    (err  ? pill('✕ '+err+' erreur'+(err>1?'s':'')+' ignorée'+(err>1?'s':''),'#ffebee','#c62828') : '');
+    (ok     ? pill('✓ '+ok+' nouveau'+(ok>1?'x':''),'#e8f5e9','#2e7d32') : '') +
+    (update ? pill('↻ '+update+' mise'+(update>1?'s':'')+' à jour','#fff3e0','#b45309') : '') +
+    (warn   ? pill('⚠ '+warn+' avertissement'+(warn>1?'s':''),'#e3f2fd','#1565c0') : '') +
+    (err    ? pill('✕ '+err+' erreur'+(err>1?'s':'')+' ignorée'+(err>1?'s':''),'#ffebee','#c62828') : '');
 
   document.getElementById('ui-import-count').textContent =
-    ok > 0 ? ok+' ligne'+(ok>1?'s':'')+' seront importées (doublons et erreurs exclus)' : 'Aucune ligne importable';
+    total_ok > 0 ? total_ok+' ligne'+(total_ok>1?'s':'')+' seront importées / mises à jour' : 'Aucune ligne importable';
 
   const thStyle = 'padding:9px 12px;text-align:left;background:#1f2937;color:rgba(255,255,255,.8);font-family:var(--cond);font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap';
   const dispLabels = ['Ligne','Prénom','Nom','Courriel','Rôle','Compagnie','Mot de passe','Statut'];
@@ -3674,7 +3685,7 @@ async function confirmUsersImport(){
   const total = validRows.length;
   const FB_API_KEY = 'AIzaSyDPq8u5bO_8yACQromO5Vzgy5g_E6xrads';
   for(const item of validRows){
-    btn.textContent = 'Import en cours… ('+( added+errors+1)+'/'+total+')';
+    btn.textContent = 'Import en cours… ('+(added+updated+errors+1)+'/'+total+')';
     const pass = item.rec.password;
     const rec  = {...item.rec};
     delete rec.password;
@@ -3682,6 +3693,14 @@ async function confirmUsersImport(){
     rec.updatedAt = FB.serverTimestamp();
     rec.createdAt = FB.serverTimestamp();
     try{
+      // Si doublon connu (existingId) → mise à jour directe sans passer par Auth
+      if(item.existingId){
+        const updateRec = {...rec};
+        delete updateRec.createdAt;
+        await FB.setDoc(FB.doc(FB.db,'users', item.existingId), updateRec, {merge:true});
+        updated++;
+        continue;
+      }
       if(rec.role === 'entreprise'){
         // Pas de compte Firebase Auth — écriture directe Firestore avec ID auto
         await FB.addDoc(FB.collection(FB.db,'users'), rec);
