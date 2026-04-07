@@ -1328,6 +1328,15 @@ function renderConseillerDashboard(){
   const livMois  = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startMois&&d<=now;})());
   const livAnnee = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startAnnee&&d<=now;})());
 
+  // Avis non livrés : conseiller_regional === consNom ET record associé pas encore Livré
+  const statutLivre = new Set(['Livré vers distributeur','Livré vers entreprise']);
+  const avisNonLivres = myAvis.filter(r=>{
+    if(!r.no_serie_hk) return true; // pas encore de HK → non livré
+    const rec = allRecords.find(x=>x.no_serie_hk===r.no_serie_hk);
+    if(!rec) return true; // record introuvable → considéré non livré
+    return !statutLivre.has(rec.statut||'');
+  });
+
   // Nouvelles entreprises ce mois — UNIQUEMENT celles qui ne sont pas encore dans allUsers (role=entreprise)
   const entreprisesUsers = new Set((allU||[]).filter(u=>u.role==='entreprise'&&u.actif!==false).map(u=>(u.compagnie||'').toLowerCase().trim()));
   const entreprisesVues = new Set();
@@ -1392,29 +1401,39 @@ function renderConseillerDashboard(){
     <!-- RANGÉE 1 : Livraisons + Nouvelles entreprises + Inactives -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
 
-      <!-- CARTE 1 : LIVRAISONS -->
-      <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
-        <div style="padding:16px 20px 12px;border-bottom:1px solid var(--mist)">
-          <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🚚 Livraisons</div>
-          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Avis avec N° HK attribué</div>
-        </div>
-        <div style="padding:14px 20px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-            <div style="background:var(--green-pale);border-radius:6px;padding:12px;text-align:center">
-              <div style="font-family:var(--cond);font-size:1.8rem;font-weight:800;color:var(--green-dark)">${livMois.length}</div>
-              <div style="font-size:.72rem;color:var(--slate)">Ce mois-ci</div>
-            </div>
-            <div style="background:var(--blue-pale);border-radius:6px;padding:12px;text-align:center">
-              <div style="font-family:var(--cond);font-size:1.8rem;font-weight:800;color:var(--blue)">${livAnnee.length}</div>
-              <div style="font-size:.72rem;color:var(--slate)">Cette année</div>
-            </div>
+      <!-- CARTE 1 : AVIS NON LIVRÉS -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Avis non livrés</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Attribués au conseiller — en attente de livraison</div>
           </div>
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--slate);margin-bottom:8px">Dernières livraisons</div>
-          ${livMois.length?livMois.slice(0,4).map(r=>`
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--mist);font-size:.76rem">
-              <span style="color:var(--steel)">${esc(r.nom_entreprise_install||r.nom_entrepreneur||'—')}</span>
-              <span style="color:var(--slate)">${esc(r.ville_site||'')}</span>
-            </div>`).join(''):'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune livraison ce mois</div>'}
+          <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:${avisNonLivres.length>0?'#dc2626':'var(--green-dark)'}">
+            ${avisNonLivres.length}
+          </div>
+        </div>
+        <!-- Carte interactive -->
+        <div id="avis-map-container" style="height:220px;position:relative;background:var(--cloud)">
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:8px;color:var(--slate)">
+            <div class="sp2"></div><span style="font-size:.78rem">Chargement de la carte…</span>
+          </div>
+        </div>
+        <!-- Liste -->
+        <div style="padding:10px 20px 14px;overflow-y:auto;flex:1;max-height:200px">
+          ${avisNonLivres.length?avisNonLivres.map(r=>{
+            const rec=allRecords.find(x=>x.no_serie_hk===r.no_serie_hk);
+            const statut=r.no_serie_hk?(rec?rec.statut||'—':"Avis d'installation"):'Sans N° HK';
+            const isRetard=r.date_installation&&new Date(r.date_installation+'T12:00:00')<new Date();
+            return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--mist)">
+              ${isRetard?'<span title="Date d\'installation passée" style="font-size:.8rem;flex-shrink:0">⚠</span>':'<span style="width:16px;flex-shrink:0"></span>'}
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.8rem;font-weight:600;color:var(--charcoal);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.nom_entreprise_install||r.nom_entrepreneur||'—')}</div>
+                <div style="font-size:.72rem;color:var(--slate);margin-top:1px">${esc(r.ville_site||'')}${r.date_installation?' — '+esc(r.date_installation):''}</div>
+              </div>
+              <span style="font-size:.68rem;padding:2px 6px;border-radius:3px;background:#e0f2fe;color:#0369a1;font-weight:600;white-space:nowrap;flex-shrink:0">${esc(statut)}</span>
+            </div>`;
+          }).join('')
+          :'<div style="font-size:.8rem;color:var(--green-dark);padding:10px 0;text-align:center">✓ Tous les avis sont livrés</div>'}
         </div>
       </div>
 
@@ -1526,7 +1545,10 @@ function renderConseillerDashboard(){
     </div>`;
 
   // Charger la carte après rendu
-  setTimeout(()=>loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois), 100);
+  setTimeout(()=>{
+    loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois);
+    loadAvisNonLivresMap(avisNonLivres);
+  }, 100);
 }
 
 // ── Créer entreprise depuis dashboard conseiller ──────
@@ -1698,6 +1720,81 @@ async function saveHydroPrime(id){
 }
 
 // ── Carte interactive ─────────────────────────────────
+// ── Carte interactive Avis non livrés ────────────────
+async function loadAvisNonLivresMap(avisNonLivres){
+  const container=document.getElementById('avis-map-container');
+  if(!container) return;
+
+  if(!avisNonLivres.length){
+    container.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--green-dark);font-size:.82rem;gap:8px"><span>✓</span><span>Aucun avis à localiser</span></div>';
+    return;
+  }
+
+  function initAvisMap(){
+    container.innerHTML='<div id="avis-nl-map" style="height:220px;width:100%"></div>';
+    const map=window.L.map('avis-nl-map').setView([46.8,-71.2],7);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap',maxZoom:18
+    }).addTo(map);
+
+    if(!window._geocache) window._geocache={};
+
+    async function geocode(query){
+      const key=query.toLowerCase().trim();
+      if(window._geocache[key]) return window._geocache[key];
+      try{
+        const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`,
+          {headers:{'Accept-Language':'fr','User-Agent':'HKTracker/1.0'}});
+        const d=await r.json();
+        if(d&&d[0]){
+          const pos={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
+          window._geocache[key]=pos;
+          return pos;
+        }
+      }catch(e){}
+      return null;
+    }
+
+    const mkIcon=(retard)=>window.L.divIcon({
+      html:`<div style="width:14px;height:14px;border-radius:50%;background:${retard?'#dc2626':'#0891b2'};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+      className:'',iconAnchor:[7,7]
+    });
+
+    const bounds=[];
+    (async()=>{
+      for(const avis of avisNonLivres){
+        const ville=avis.ville_site||'';
+        const adresse=avis.no_civique_rue?`${avis.no_civique_rue}, ${ville}`:ville;
+        if(!ville) continue;
+        let pos=adresse.length>ville.length?await geocode(adresse+', Québec, Canada'):null;
+        if(!pos) pos=await geocode(ville+', Québec, Canada');
+        if(pos){
+          const isRetard=avis.date_installation&&new Date(avis.date_installation+'T12:00:00')<new Date();
+          const nom=avis.nom_entreprise_install||avis.nom_entrepreneur||'—';
+          const rec=allRecords.find(x=>x.no_serie_hk===avis.no_serie_hk);
+          const statut=avis.no_serie_hk?(rec?rec.statut||'—':"Avis d'installation"):'Sans N° HK';
+          const jitter=(Math.random()-0.5)*0.008;
+          window.L.marker([pos.lat+jitter,pos.lng+jitter],{icon:mkIcon(isRetard)})
+            .addTo(map)
+            .bindPopup(`<b>${esc(nom)}</b><br>${esc(ville)}${avis.date_installation?'<br>📅 '+esc(avis.date_installation):''}<br><span style="font-size:11px;color:#0369a1">${esc(statut)}</span>${isRetard?'<br><span style="color:#dc2626;font-size:11px">⚠ Date passée</span>':''}`);
+          bounds.push([pos.lat,pos.lng]);
+          if(bounds.length>1) map.fitBounds(bounds,{padding:[20,20]});
+          await new Promise(r=>setTimeout(r,1200));
+        }
+      }
+      if(bounds.length===1) map.setView(bounds[0],11);
+    })();
+  }
+
+  if(!window.L){
+    const link=document.createElement('link');link.rel='stylesheet';link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(link);
+    const script=document.createElement('script');script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=initAvisMap;document.head.appendChild(script);
+  } else {
+    initAvisMap();
+  }
+}
+
 function loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois){
   const container=document.getElementById('cons-map-container');
   if(!container)return;
