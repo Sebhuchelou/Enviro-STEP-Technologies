@@ -1264,8 +1264,9 @@ function renderConseillerDashboard(){
   const allHP    = window.allHydroPrime||[];
   const allU     = allUsers||[];
 
-  // Avis du conseiller (conseiller_regional === session.compagnie)
-  const myAvis = allAvis.filter(r=>(r.conseiller_regional||'')===(session.compagnie||''));
+  // Avis du conseiller (conseiller_regional === prénom + nom du conseiller)
+  const consNom = ((session.prenom||'')+' '+(session.nom||'')).trim();
+  const myAvis = allAvis.filter(r=>(r.conseiller_regional||'')===(consNom||''));
 
   function avisDate(r){ const d=r.createdAt?.toDate?r.createdAt.toDate():(r.createdAt?new Date(r.createdAt):null); return d&&!isNaN(d)?d:null; }
 
@@ -1965,8 +1966,8 @@ function getRows(){
     if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab||r.assembleur_dist===activeAsmTab);
   }
   else if(session.role==='conseiller'){
-    // Filtre principal : champ conseiller = compagnie du conseiller connecté
-    rows=rows.filter(r=>(r.conseiller||'')===(session.compagnie||''));
+    const consNom=((session.prenom||'')+' '+(session.nom||'')).trim();
+    rows=rows.filter(r=>(r.conseiller||'')===(consNom||''));
   }
   if(searchQ){const q=searchQ.toLowerCase();rows=rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)))}
   if(fAsm)rows=rows.filter(r=>r.nom_assembleur===fAsm||r.assembleur_dist===fAsm);
