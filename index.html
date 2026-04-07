@@ -914,16 +914,15 @@ function setupApp(){
         <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Avis d'installation
       </button>`;
   } else {
-    const navLabel = session.role==='assembleur' ? 'Mes assemblages' : session.role==='distributeur' ? 'Mes livraisons' : 'Mon tableau';
-    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${(session.role==='assembleur'||session.role==='distributeur')?'dashboard':'tableau'}',this)">
+    const navLabel = session.role==='assembleur' ? 'Mes assemblages' : session.role==='distributeur' ? 'Mes livraisons' : session.role==='conseiller' ? 'Mon tableau de bord' : 'Mon tableau';
+    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${(session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller')?'dashboard':'tableau'}',this)">
       <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>${navLabel}
     </button>`;
   }
 
-  currentPanel = (session.role==='assembleur'||session.role==='distributeur') ? 'dashboard' : 'tableau';
+  currentPanel = (session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller') ? 'dashboard' : 'tableau';
   startListeners();
-  // Force immediate render for assembleur/distributeur even before snapshot arrives
-  if(session.role==='assembleur'||session.role==='distributeur'){
+  if(session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller'){
     renderDashboard();
   }
 }
@@ -950,8 +949,8 @@ function startListeners(){
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
   }
 
-  // AvisInstal listener (admin + assembleur)
-  if(session.role==='administrateur'||session.role==='assembleur'){
+  // AvisInstal listener (admin + assembleur + distributeur + conseiller)
+  if(session.role==='administrateur'||session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller'){
     const aiQuery = FB.collection(FB.db,'AvisInstal');
     window._unsubAvisInstal = FB.onSnapshot(aiQuery, snap=>{
       window.allAvisInstal=[];
@@ -959,6 +958,25 @@ function startListeners(){
       if(currentPanel==='avisInstal') renderAvisInstal();
       if(currentPanel==='dashboard') renderDashboard();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
+  }
+
+  // HydroPrime listener (admin + conseiller)
+  if(session.role==='administrateur'||session.role==='conseiller'){
+    window._unsubHydroPrime = FB.onSnapshot(FB.collection(FB.db,'HydroPrime'), snap=>{
+      window.allHydroPrime=[];
+      snap.forEach(d=>window.allHydroPrime.push({id:d.id,...d.data()}));
+      if(currentPanel==='dashboard') renderDashboard();
+    }, err=>toast('Erreur lecture HydroPrime: '+err.message,'err'));
+  }
+
+  // Users listener (admin + conseiller for map)
+  if(session.role==='administrateur'||session.role==='conseiller'){
+    unsubUsers = FB.onSnapshot(FB.collection(FB.db,'users'), snap=>{
+      allUsers=[];
+      snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
+      if(currentPanel==='users') renderUsers();
+      if(currentPanel==='dashboard') renderDashboard();
+    }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
   }
 }
 
@@ -1023,6 +1041,7 @@ let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 
 function renderDashboard(){
   if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard') { renderTableauFiltered(); return; }
+  if(session.role==='conseiller'){ renderConseillerDashboard(); return; }
 
   const isDist = session.role==='distributeur';
   const allMyRows = allRecords.filter(r=>
@@ -1227,6 +1246,415 @@ function renderDashboard(){
     </div>`;
 }
 
+
+// ════════════════════════════════════════════════════════
+// DASHBOARD CONSEILLER
+// ════════════════════════════════════════════════════════
+let consInactifFilter = 'plus1'; // plus1 | plus3 | plus6 | plus12
+
+function renderConseillerDashboard(){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const y=now.getFullYear(), m=now.getMonth();
+  const startMois  = new Date(y, m, 1);
+  const startAnnee = new Date(y, 0, 1);
+  const il12mois   = new Date(now); il12mois.setFullYear(il12mois.getFullYear()-1);
+
+  const allAvis  = window.allAvisInstal||[];
+  const allHP    = window.allHydroPrime||[];
+  const allU     = allUsers||[];
+
+  // Avis du conseiller (conseiller_regional === session.compagnie)
+  const myAvis = allAvis.filter(r=>(r.conseiller_regional||'')===(session.compagnie||''));
+
+  function avisDate(r){ const d=r.createdAt?.toDate?r.createdAt.toDate():(r.createdAt?new Date(r.createdAt):null); return d&&!isNaN(d)?d:null; }
+
+  // Livraisons du mois / année (avis avec no_serie_hk et date dans la période)
+  const livMois  = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startMois&&d<=now;})());
+  const livAnnee = myAvis.filter(r=>r.no_serie_hk&&(()=>{const d=avisDate(r);return d&&d>=startAnnee&&d<=now;})());
+
+  // Nouvelles entreprises ce mois (première apparition dans myAvis ce mois)
+  const entreprisesVues = new Set();
+  const entreprisesMois = [];
+  [...myAvis].sort((a,b)=>{const da=avisDate(a)||new Date(0),db=avisDate(b)||new Date(0);return da-db;})
+    .forEach(r=>{
+      const e=r.nom_entreprise_install||r.nom_entrepreneur||'';
+      if(!e) return;
+      const d=avisDate(r);
+      if(d&&d>=startMois&&!entreprisesVues.has(e)) entreprisesMois.push({nom:e, date:d});
+      entreprisesVues.add(e);
+    });
+
+  // Entreprises inactives — dernière date d'avis < seuil
+  const seuilMap={'plus1':1,'plus3':3,'plus6':6,'plus12':12};
+  const moisSeuil=seuilMap[consInactifFilter]||1;
+  const seuil=new Date(now); seuil.setMonth(seuil.getMonth()-moisSeuil);
+  const lastAvisParEnt={};
+  myAvis.forEach(r=>{
+    const e=r.nom_entreprise_install||r.nom_entrepreneur||'';
+    if(!e) return;
+    const d=avisDate(r);
+    if(!d) return;
+    if(!lastAvisParEnt[e]||d>lastAvisParEnt[e]) lastAvisParEnt[e]=d;
+  });
+  const entreprisesInactives=Object.entries(lastAvisParEnt)
+    .filter(([,d])=>d<seuil)
+    .sort((a,b)=>a[1]-b[1])
+    .map(([nom,d])=>({nom,date:d}));
+
+  // Assembleurs et distributeurs pour la carte
+  const assembleurs = allU.filter(u=>u.role==='assembleur'&&u.actif!==false&&u.ville);
+  const distributeurs = allU.filter(u=>u.role==='distributeur'&&u.actif!==false&&u.ville);
+
+  // Résumé HydroPrime
+  const totalCumule  = allHP.reduce((s,r)=>s+(r.hydro_prime_cumule||0),0);
+  const totalUtilise = allHP.reduce((s,r)=>s+(r.hydro_prime_utilises||0),0);
+  const totalRestant = allHP.reduce((s,r)=>s+(r.hydro_prime_restants||0),0);
+
+  const fmt$ = v => new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0}).format(v||0);
+
+  const seuilOpts=['plus1','plus3','plus6','plus12'];
+  const seuilLabels={'plus1':'Plus d\'1 mois','plus3':'Plus de 3 mois','plus6':'Plus de 6 mois','plus12':'Plus de 12 mois'};
+
+  document.getElementById('app-main').innerHTML=`
+    <div class="page-header">
+      <div>
+        <div class="page-title">Tableau de bord — ${esc(session.compagnie||session.prenom||'')}</div>
+        <div class="page-sub">${myAvis.length} avis d'installation associés</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="switchToConsTableau()">
+          <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Tableau de suivi
+        </button>
+      </div>
+    </div>
+
+    <!-- RANGÉE 1 : Livraisons + Nouvelles entreprises + Inactives -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+
+      <!-- CARTE 1 : LIVRAISONS -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:16px 20px 12px;border-bottom:1px solid var(--mist)">
+          <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🚚 Livraisons</div>
+          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Avis avec N° HK attribué</div>
+        </div>
+        <div style="padding:14px 20px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div style="background:var(--green-pale);border-radius:6px;padding:12px;text-align:center">
+              <div style="font-family:var(--cond);font-size:1.8rem;font-weight:800;color:var(--green-dark)">${livMois.length}</div>
+              <div style="font-size:.72rem;color:var(--slate)">Ce mois-ci</div>
+            </div>
+            <div style="background:var(--blue-pale);border-radius:6px;padding:12px;text-align:center">
+              <div style="font-family:var(--cond);font-size:1.8rem;font-weight:800;color:var(--blue)">${livAnnee.length}</div>
+              <div style="font-size:.72rem;color:var(--slate)">Cette année</div>
+            </div>
+          </div>
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--slate);margin-bottom:8px">Dernières livraisons</div>
+          ${livMois.length?livMois.slice(0,4).map(r=>`
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--mist);font-size:.76rem">
+              <span style="color:var(--steel)">${esc(r.nom_entreprise_install||r.nom_entrepreneur||'—')}</span>
+              <span style="color:var(--slate)">${esc(r.ville_site||'')}</span>
+            </div>`).join(''):'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune livraison ce mois</div>'}
+        </div>
+      </div>
+
+      <!-- CARTE 2 : NOUVELLES ENTREPRISES -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #7c3aed;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🆕 Nouvelles entreprises</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Premier avis ce mois-ci</div>
+          </div>
+          <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#7c3aed">${entreprisesMois.length}</div>
+        </div>
+        <div style="padding:14px 20px;max-height:200px;overflow-y:auto">
+          ${entreprisesMois.length?entreprisesMois.map(e=>`
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--mist)">
+              <div style="width:6px;height:6px;border-radius:50%;background:#7c3aed;flex-shrink:0"></div>
+              <span style="font-size:.78rem;color:var(--charcoal);font-weight:600;flex:1">${esc(e.nom)}</span>
+              <span style="font-size:.72rem;color:var(--slate)">${e.date.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span>
+            </div>`).join(''):'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune nouvelle entreprise ce mois</div>'}
+        </div>
+      </div>
+
+      <!-- CARTE 3 : ENTREPRISES INACTIVES -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #dc2626;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">⚠ Entreprises inactives</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Sans avis depuis :</div>
+          </div>
+          <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#dc2626">${entreprisesInactives.length}</div>
+        </div>
+        <div style="padding:10px 20px 0">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            ${seuilOpts.map(s=>`<button onclick="consInactifFilter='${s}';renderConseillerDashboard()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--cond);cursor:pointer;border:2px solid ${consInactifFilter===s?'#dc2626':'var(--mist)'};background:${consInactifFilter===s?'#fee2e2':'transparent'};color:${consInactifFilter===s?'#dc2626':'var(--slate)'}">${seuilLabels[s]}</button>`).join('')}
+          </div>
+        </div>
+        <div style="padding:0 20px 14px;max-height:160px;overflow-y:auto">
+          ${entreprisesInactives.length?entreprisesInactives.map(e=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--mist)">
+              <span style="font-size:.78rem;color:var(--charcoal);font-weight:600">${esc(e.nom)}</span>
+              <span style="font-size:.72rem;padding:2px 7px;border-radius:3px;background:#fee2e2;color:#dc2626">Dernier : ${e.date.toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric'})}</span>
+            </div>`).join(''):'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune entreprise inactive</div>'}
+        </div>
+      </div>
+    </div>
+
+    <!-- RANGÉE 2 : HydroPrime + Carte interactive -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:16px">
+
+      <!-- CARTE 4 : HYDRO-PRIME -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #f59e0b;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:16px 20px 12px;border-bottom:1px solid var(--mist)">
+          <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">💰 Hydro-Prime</div>
+          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${allHP.length} entreprise${allHP.length!==1?'s':''} inscrites</div>
+        </div>
+        <div style="padding:14px 20px">
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fffbeb;border-radius:6px;border:1px solid #fde68a">
+              <span style="font-size:.78rem;font-weight:600;color:#92400e">Cumulés</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#b45309">${fmt$(totalCumule)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca">
+              <span style="font-size:.78rem;font-weight:600;color:#991b1b">Utilisés</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#dc2626">${fmt$(totalUtilise)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">
+              <span style="font-size:.78rem;font-weight:600;color:#166534">Restants</span>
+              <span style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:var(--green-dark)">${fmt$(totalRestant)}</span>
+            </div>
+          </div>
+          <button onclick="renderHydroPrimeTable()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid #f59e0b;background:transparent;color:#b45309;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir le tableau →</button>
+        </div>
+      </div>
+
+      <!-- CARTE 5 : CARTE INTERACTIVE -->
+      <div style="background:#fff;border-radius:8px;border-left:5px solid #0891b2;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden">
+        <div style="padding:16px 20px 12px;border-bottom:1px solid var(--mist)">
+          <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🗺 Carte des installations</div>
+          <div style="font-size:.75rem;color:var(--slate);margin-top:2px">12 derniers mois + assembleurs + distributeurs</div>
+        </div>
+        <div id="cons-map-container" style="height:340px;position:relative">
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:10px;color:var(--slate)">
+            <div class="sp2"></div>
+            <span style="font-size:.82rem">Chargement de la carte…</span>
+          </div>
+        </div>
+        <div style="padding:10px 20px;display:flex;gap:14px;flex-wrap:wrap;border-top:1px solid var(--mist)">
+          <span style="font-size:.72rem;display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:#1b5fa8;display:inline-block"></span>Installation (12 mois)</span>
+          <span style="font-size:.72rem;display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span>Assembleur</span>
+          <span style="font-size:.72rem;display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;display:inline-block"></span>Distributeur</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RANGÉE 3 : Tableau de suivi -->
+    <div style="margin-top:16px">
+      <div style="background:#fff;border-radius:8px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">📋 Tableau de suivi</div>
+          <div style="font-size:.75rem;color:var(--slate);margin-top:3px">
+            Tous les enregistrements associés à <strong>${esc(session.compagnie||'')}</strong> — colonnes adaptées, modifications limitées aux champs autorisés
+          </div>
+        </div>
+        <button onclick="switchToConsTableau()" style="white-space:nowrap;padding:9px 20px;border-radius:var(--r);border:2px solid var(--green);background:var(--green);color:#fff;font-family:var(--cond);font-size:.78rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Ouvrir le tableau →</button>
+      </div>
+    </div>`;
+
+  // Charger la carte après rendu
+  setTimeout(()=>loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois), 100);
+}
+
+function switchToConsTableau(){
+  currentPanel='tableau';
+  // Highlight nav button if exists
+  document.querySelectorAll('.nav-link').forEach(b=>{
+    if(b.onclick&&b.onclick.toString().includes('tableau')) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+  renderTableau();
+}
+
+// ── Tableau HydroPrime ────────────────────────────────
+function renderHydroPrimeTable(){
+  const allHP=window.allHydroPrime||[];
+  const sorted=[...allHP].sort((a,b)=>(a.nom_entreprise||'').localeCompare(b.nom_entreprise||'','fr'));
+  const fmt$=v=>new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD',maximumFractionDigits:0}).format(v||0);
+
+  const rows=sorted.length?sorted.map(r=>{
+    const isE=editingId===r.id;
+    const utilises=isE?(editBuf.hydro_prime_utilises??r.hydro_prime_utilises??0):(r.hydro_prime_utilises||0);
+    const cumule=r.hydro_prime_cumule||0;
+    const pct=cumule>0?Math.round((utilises/cumule)*100):0;
+    return`<tr id="row-${r.id}">
+      <td style="font-weight:600;color:var(--charcoal)">${esc(r.nom_entreprise||'—')}</td>
+      <td>${esc(r.ville||'—')}</td>
+      <td>${esc(r.telephone||'—')}</td>
+      <td style="text-align:right;font-family:var(--cond);font-weight:700;color:#b45309">${fmt$(cumule)}</td>
+      <td style="text-align:right">
+        ${isE
+          ?`<input type="number" step="0.01" value="${utilises}" oninput="editBuf.hydro_prime_utilises=parseFloat(this.value)||0" style="width:110px;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.82rem;background:#e8f4fd"/>`
+          :`<span style="font-family:var(--cond);font-weight:700;color:#dc2626">${fmt$(utilises)}</span>`}
+      </td>
+      <td style="text-align:right;font-family:var(--cond);font-weight:700;color:var(--green-dark)">${fmt$(cumule-utilises)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:6px;background:var(--mist);border-radius:3px;overflow:hidden;min-width:60px"><div style="height:100%;background:${pct>80?'#dc2626':'#f59e0b'};width:${Math.min(pct,100)}%;border-radius:3px"></div></div>
+          <span style="font-size:.72rem;color:var(--slate);min-width:30px">${pct}%</span>
+        </div>
+      </td>
+      <td class="td-actions">
+        ${isE
+          ?`<button class="row-btn save-btn" onclick="saveHydroPrime('${r.id}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="cancelEdit()">✕</button>`
+          :`<button class="row-btn edit-btn" onclick="startEditHP('${r.id}')">✎</button>`}
+      </td>
+    </tr>`;
+  }).join('')
+  :`<tr><td colspan="8"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
+
+  document.getElementById('app-main').innerHTML=`
+    <div class="page-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
+        </button>
+        <div>
+          <div class="page-title">💰 Tableau Hydro-Prime</div>
+          <div class="page-sub" style="color:#b45309">${sorted.length} entreprise${sorted.length!==1?'s':''}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tbl-card">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Entreprise</th><th>Ville</th><th>Téléphone</th>
+            <th style="text-align:right">Cumulés</th>
+            <th style="text-align:right">Utilisés</th>
+            <th style="text-align:right">Restants</th>
+            <th style="min-width:120px">Utilisation</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function startEditHP(id){
+  const r=(window.allHydroPrime||[]).find(x=>x.id===id);
+  if(!r)return;
+  editBuf={...r};editingId=id;renderHydroPrimeTable();
+}
+
+async function saveHydroPrime(id){
+  setSyncing(true);
+  try{
+    const utilises=parseFloat(editBuf.hydro_prime_utilises)||0;
+    const r=(window.allHydroPrime||[]).find(x=>x.id===id);
+    const cumule=r?r.hydro_prime_cumule||0:0;
+    await FB.updateDoc(FB.doc(FB.db,'HydroPrime',id),{
+      hydro_prime_utilises: utilises,
+      hydro_prime_restants: cumule-utilises,
+      updatedAt: FB.serverTimestamp()
+    });
+    editingId=null;editBuf={};
+    toast('HydroPrime mis à jour ✓');
+  }catch(e){toast('Erreur: '+e.message,'err')}
+  setSyncing(false);
+}
+
+// ── Carte interactive ─────────────────────────────────
+function loadConseillerMap(myAvis, assembleurs, distributeurs, il12mois){
+  const container=document.getElementById('cons-map-container');
+  if(!container)return;
+
+  // Préparer les données — installations 12 derniers mois avec coordonnées via geocoding
+  const installs12 = myAvis.filter(r=>{
+    if(!r.no_serie_hk) return false;
+    const d=r.createdAt?.toDate?r.createdAt.toDate():(r.createdAt?new Date(r.createdAt):null);
+    return d&&d>=il12mois;
+  });
+
+  // On utilise Leaflet (CDN libre) + OpenStreetMap
+  if(!window.L){
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const script=document.createElement('script');
+    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=()=>initMap(container,installs12,assembleurs,distributeurs);
+    document.head.appendChild(script);
+  } else {
+    initMap(container,installs12,assembleurs,distributeurs);
+  }
+}
+
+async function initMap(container,installs,assembleurs,distributeurs){
+  container.innerHTML='<div id="cons-map" style="height:340px;width:100%"></div>';
+  const map=window.L.map('cons-map').setView([46.8,-71.2],7);
+  window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:18
+  }).addTo(map);
+
+  const mkIcon=(color,size=10)=>window.L.divIcon({
+    html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    className:'',iconAnchor:[size/2,size/2]
+  });
+
+  // Geocoder une adresse via Nominatim (rate-limit friendly : 1 req/sec)
+  async function geocode(query){
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=ca&format=json&limit=1`,{headers:{'Accept-Language':'fr'}});
+      const d=await r.json();
+      if(d&&d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon),label:d[0].display_name};
+    }catch(e){}
+    return null;
+  }
+
+  // Installations — geocoder par ville_site
+  const villesDone={};
+  for(const inst of installs.slice(0,30)){
+    const ville=inst.ville_site||inst.no_civique_rue||'';
+    if(!ville) continue;
+    const key=ville.toLowerCase().trim();
+    if(!villesDone[key]){
+      const pos=await geocode(ville+', Québec, Canada');
+      if(pos){
+        villesDone[key]=pos;
+        await new Promise(r=>setTimeout(r,1100));
+      }
+    }
+    if(villesDone[key]){
+      window.L.marker([villesDone[key].lat,villesDone[key].lng],{icon:mkIcon('#1b5fa8',12)})
+        .addTo(map)
+        .bindPopup(`<b>${esc(inst.nom_entreprise_install||inst.nom_entrepreneur||'Installation')}</b><br>${esc(ville)}`);
+    }
+  }
+
+  // Assembleurs — par ville
+  for(const u of assembleurs){
+    const pos=await geocode((u.ville||'')+', Québec, Canada');
+    if(pos){
+      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('var(--green)',14)})
+        .addTo(map)
+        .bindPopup(`<b>🔧 ${esc(u.compagnie||u.nom||'')}</b><br>Assembleur — ${esc(u.ville||'')}`);
+      await new Promise(r=>setTimeout(r,1100));
+    }
+  }
+
+  // Distributeurs — par ville
+  for(const u of distributeurs){
+    const pos=await geocode((u.ville||'')+', Québec, Canada');
+    if(pos){
+      window.L.marker([pos.lat,pos.lng],{icon:mkIcon('#7c3aed',14)})
+        .addTo(map)
+        .bindPopup(`<b>🚚 ${esc(u.compagnie||u.nom||'')}</b><br>Distributeur — ${esc(u.ville||'')}`);
+      await new Promise(r=>setTimeout(r,1100));
+    }
+  }
+}
 
 function renderTableauFiltered(){
   const statutMap={
@@ -1496,20 +1924,30 @@ const COLS_DIST=[
   {k:'statut',               l:'Statut',                       t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
-  {k:'no_serie_hk',          l:'N° Série HK', hk:true},
-  {k:'produit_principal',    l:'Produit Principal'},
-  {k:'produit2',             l:'Produit #2'},
-  {k:'produit3',             l:'Produit #3'},
+  {k:'po_assembleur',        l:'#PO Assembleur',                                               ro:true},
+  {k:'po_norweco',           l:'#PO Norweco',                                                  ro:true},
+  {k:'nom_assembleur',       l:"Nom de l'Assembleur",                                          ro:true},
+  {k:'recu_le',              l:'Date réception assembleur',          t:'date',                 ro:true},
+  {k:'no_serie_hk',          l:'N° Série HK',                        hk:true,                 ro:true},
+  {k:'produit_principal',    l:'Produit Principal',                                            ro:true},
+  {k:'produit2',             l:'Produit #2',                                                   ro:true},
+  {k:'produit3',             l:'Produit #3',                                                   ro:true},
   {k:'conseiller',           l:'Conseiller'},
-  {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
+  {k:'nom_entrepreneur',     l:"Nom de l'entrepreneur"},
   {k:'nom_installateur',     l:'Installateur autorisé'},
+  {k:'date_livraison',       l:'Date livraison assembleur',          t:'date',                 ro:true},
+  {k:'type_client',          l:"Entrepreneur direct ou distributeur ?",                        ro:true},
+  {k:'nom_distributeur',     l:'Nom du distributeur',                                         ro:true},
+  {k:'date_livraison_dist',  l:'Date livraison distributeur',        t:'date',                 ro:true},
   {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
-  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
-  {k:'nom_distributeur',     l:'Nom du distributeur'},
+  {k:'notes_assembleur',     l:'Notes assembleur',                                             ro:true},
+  {k:'notes_distributeur',   l:'Notes distributeur',                                           ro:true},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
   {k:'identification_site',  l:"Identification du site d'installation"},
-  {k:'statut',               l:'Statut'},
+  {k:'statut',               l:'Statut',                             t:'sel', opts:STATUT_OPTS},
+  {k:'derniere_modif',       l:'Dernière modification',              t:'date',                 ro:true},
+  {k:'dernier_utilisateur',  l:'Dernier utilisateur',                                          ro:true},
 ];
 function getCols(){
   if(session.role==='administrateur')return COLS_ADMIN;
@@ -1525,8 +1963,8 @@ function getRows(){
     if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab||r.assembleur_dist===activeAsmTab);
   }
   else if(session.role==='conseiller'){
-    const allowed=Array.isArray(session.mrcs)?session.mrcs:[];
-    rows=rows.filter(r=>allowed.includes(r.ville_livraison)||allowed.includes(r.mrc));
+    // Filtre principal : champ conseiller = compagnie du conseiller connecté
+    rows=rows.filter(r=>(r.conseiller||'')===(session.compagnie||''));
   }
   if(searchQ){const q=searchQ.toLowerCase();rows=rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q)))}
   if(fAsm)rows=rows.filter(r=>r.nom_assembleur===fAsm||r.assembleur_dist===fAsm);
@@ -1587,9 +2025,12 @@ function renderTableau(){
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
-      <div>
-        <div class="page-title">${isAdmin?'Tableau de suivi global':session.role==='assembleur'?'Mes assemblages':session.role==='conseiller'?'Fiches par MRC':'Mes livraisons'}</div>
-        <div class="page-sub">Données Firebase en temps réel — ${rows.length} enregistrement${rows.length!==1?'s':''}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        ${isCons?`<button onclick="renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Tableau de bord</button>`:''}
+        <div>
+          <div class="page-title">${isAdmin?'Tableau de suivi global':session.role==='assembleur'?'Mes assemblages':session.role==='conseiller'?'Tableau de suivi — Mes dossiers':'Mes livraisons'}</div>
+          <div class="page-sub">Données Firebase en temps réel — ${rows.length} enregistrement${rows.length!==1?'s':''}</div>
+        </div>
       </div>
       <div class="page-actions">
         ${!isCons?`<button class="btn btn-primary" onclick="addRow()">
@@ -1665,7 +2106,7 @@ function rowHtml(row,cols){
   const isCons=session.role==='conseiller';
   const actions=isE
     ?`<td class="td-actions"><button class="row-btn save-btn" onclick="saveRow('${row.id}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="cancelEdit()">✕</button></td>`
-    :`<td class="td-actions">${isCons?'<span style="font-size:.74rem;color:var(--slate)">Lecture seule</span>':`<button class="row-btn edit-btn" onclick="startEdit('${row.id}')">✎</button>${isAdmin?`<button class="row-btn del-btn" onclick="deleteRow('${row.id}')">🗑</button>`:''}`}</td>`;
+    :`<td class="td-actions"><button class="row-btn edit-btn" onclick="startEdit('${row.id}')">✎</button>${isAdmin?`<button class="row-btn del-btn" onclick="deleteRow('${row.id}')">🗑</button>`:''}</td>`;
   return`<tr id="row-${row.id}"${isE?' class="editing-row"':''}${selectedRows.has(row.id)?' style="background:#fff3cd"':''}>${chkCell}${cells}${actions}</tr>`;
 }
 
@@ -1744,16 +2185,66 @@ async function saveRow(id){
   }
   setSyncing(true);
   try{
+    const oldRow=allRecords.find(r=>r.id===id);
     const data={...editBuf};
     delete data.id;
     data.derniere_modif=nowStr();
     data.dernier_utilisateur=session.email||session.nom||'';
     data.updatedAt=FB.serverTimestamp();
     await FB.updateDoc(FB.doc(FB.db,'records',id), data);
+
+    // ── Mise à jour HydroPrime si passage au statut Livré ──────────
+    const newStatut=data.statut||'';
+    const oldStatut=oldRow?oldRow.statut||'':'';
+    const isNowLivre=newStatut.startsWith('Livré');
+    const wasLivre=oldStatut.startsWith('Livré');
+    if(isNowLivre && !wasLivre){
+      await updateHydroPrime(data.nom_entrepreneur||oldRow.nom_entrepreneur||'');
+    } else if(!isNowLivre && wasLivre){
+      // Si on retire le statut livré, recalculer aussi
+      await updateHydroPrime(data.nom_entrepreneur||oldRow.nom_entrepreneur||'');
+    }
+
     editingId=null;editBuf={};
     toast('Enregistré avec succès ✓');
   }catch(e){toast('Erreur: '+e.message,'err')}
   setSyncing(false);
+}
+
+// ── Met à jour (ou crée) le document HydroPrime pour une entreprise ──
+async function updateHydroPrime(nomEntreprise){
+  if(!nomEntreprise) return;
+  // Compter les records livrés pour cette entreprise
+  const livres=allRecords.filter(r=>
+    (r.nom_entrepreneur||'')=== nomEntreprise &&
+    (r.statut||'').startsWith('Livré')
+  );
+  const cumule = livres.length * 100;
+
+  // Chercher le doc existant
+  const q=await FB.getDocs(FB.query(FB.collection(FB.db,'HydroPrime'),FB.where('nom_entreprise','==',nomEntreprise)));
+  if(q.empty){
+    // Créer
+    await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{
+      nom_entreprise: nomEntreprise,
+      ville: '',
+      telephone: '',
+      hydro_prime_cumule: cumule,
+      hydro_prime_utilises: 0,
+      hydro_prime_restants: cumule,
+      updatedAt: FB.serverTimestamp(),
+      createdAt: FB.serverTimestamp()
+    });
+  } else {
+    const docRef=q.docs[0].ref;
+    const existing=q.docs[0].data();
+    const utilises=existing.hydro_prime_utilises||0;
+    await FB.updateDoc(docRef,{
+      hydro_prime_cumule: cumule,
+      hydro_prime_restants: cumule - utilises,
+      updatedAt: FB.serverTimestamp()
+    });
+  }
 }
 
 async function deleteRow(id){
