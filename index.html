@@ -948,6 +948,7 @@ function startListeners(){
       snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
       if(currentPanel==='users') renderUsers();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
+  }
 
   // AvisInstal listener (admin + assembleur)
   if(session.role==='administrateur'||session.role==='assembleur'){
