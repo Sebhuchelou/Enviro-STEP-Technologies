@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>HK Tracker — Suivi Assemblages | Enviro-STEP</title>
+<title>Enviro-STEP — Suivi Assemblages</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
 
@@ -581,15 +581,11 @@ tbody tr:hover{background:#f8fbf5;}
       <div class="home-secondary-actions">
         <button type="button" class="home-secondary-btn" onclick="openLogin('administrateur')">
           <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          Administrateur
+          Administration &amp; Comptabilité
         </button>
         <button type="button" class="home-secondary-btn" onclick="openLogin('conseiller')">
           <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           Espace Conseiller
-        </button>
-        <button type="button" class="home-secondary-btn" onclick="openLogin('comptabilite')" style="border-color:#0f766e;color:#0f766e">
-          <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-          Comptabilité
         </button>
       </div>
 
@@ -674,7 +670,7 @@ tbody tr:hover{background:#f8fbf5;}
 <!-- ═══════════════════ APP ═════════════════════════════════ -->
 <div id="app">
   <div class="utility-bar">
-    <span id="app-util-info">HK Tracker</span>
+    <span id="app-util-info">Enviro-STEP</span>
     <div class="utility-sep"></div>
     <div class="sync-badge"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">En ligne</span></div>
   </div>
@@ -790,8 +786,8 @@ const ROLE_META={
   assembleur:   {title:'Espace Assembleur',   sub:'Réservé aux assembleurs autorisés',       color:'#4caf1a', modal:''},
   distributeur: {title:'Espace Distributeur', sub:'Réservé aux distributeurs autorisés',     color:'#1b5fa8', modal:'border-blue'},
   conseiller:   {title:'Espace Conseiller',   sub:'Lecture des fiches par MRC attribuées',   color:'#7c3aed', modal:''},
-  administrateur:{title:'Administration',     sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#1e2530', modal:'border-dark'},
-  comptabilite: {title:'Comptabilité',        sub:'Gestion des installateurs et Hydro-Prime',color:'#0f766e', modal:'border-dark'},
+  administrateur:{title:'Administration & Comptabilité', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#1e2530', modal:'border-dark'},
+  comptabilite:  {title:'Administration & Comptabilité', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#0f766e', modal:'border-dark'},
 };
 
 function openLogin(role){
@@ -973,6 +969,14 @@ function startListeners(){
       if(currentPanel==='dashboard') renderDashboard();
       if(currentPanel==='tableau') renderTableau();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
+  }
+
+  // Users listener (assembleur + distributeur — nécessaire pour modal attribution et filtres)
+  if(session.role==='assembleur'||session.role==='distributeur'){
+    unsubUsers = FB.onSnapshot(FB.collection(FB.db,'users'), snap=>{
+      allUsers=[];
+      snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
+    }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
   }
 
   // HydroPrime listener (admin + conseiller)
@@ -1247,17 +1251,34 @@ function renderDashboard(){
   const kpiNow=new Date(); kpiNow.setHours(0,0,0,0);
   const kpiEndWeek=new Date(kpiNow); kpiEndWeek.setDate(kpiNow.getDate()+(6-kpiNow.getDay()));
   const kpiEndMonth=new Date(kpiNow.getFullYear(),kpiNow.getMonth()+1,0);
+  // Construire un index avis par no_serie_hk pour lookup rapide
+  const avisMap={};
+  (window.allAvisInstal||[]).forEach(a=>{if(a.no_serie_hk)avisMap[a.no_serie_hk]=a;});
+  // Pour les avis sans HK, chercher par assembleur_attribue
+  const avisNoHk=(window.allAvisInstal||[]).filter(a=>!a.no_serie_hk&&(a.assembleur_attribue||'')===(session.compagnie||''));
   function kpiDate(r){
-    const d1=r.date_livraison?new Date(r.date_livraison+'T12:00:00'):null;
-    const d2=r.date_livraison_dist?new Date(r.date_livraison_dist+'T12:00:00'):null;
-    if(d1&&!isNaN(d1))return d1;
-    if(d2&&!isNaN(d2))return d2;
+    // Priorité : date_livraison du record, sinon date_installation de l'avis lié
+    if(r.date_livraison){const d=new Date(r.date_livraison+'T12:00:00');if(!isNaN(d))return d;}
+    if(r.date_livraison_dist){const d=new Date(r.date_livraison_dist+'T12:00:00');if(!isNaN(d))return d;}
+    // Chercher dans les avis liés par no_serie_hk
+    const avis=r.no_serie_hk?avisMap[r.no_serie_hk]:null;
+    if(avis?.date_installation){const d=new Date(avis.date_installation+'T12:00:00');if(!isNaN(d))return d;}
     return null;
   }
+  function kpiDateAvis(a){
+    if(a.date_installation){const d=new Date(a.date_installation+'T12:00:00');if(!isNaN(d))return d;}
+    return null;
+  }
+  // Records fabriqués / avis d'installation de l'assembleur
   const kpiRows = allMyRows.filter(r=>r.statut==='Fabriqué'||r.statut==="Avis d'installation");
-  const kpiSemaine  = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d>=kpiNow&&d<=kpiEndWeek;});
-  const kpiMois     = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d>=kpiNow&&d<=kpiEndMonth;});
-  const kpiRetard   = kpiRows.filter(r=>{const d=kpiDate(r);return d&&d<kpiNow;});
+  // Avis sans HK attribués à cet assembleur (= à traiter, avec date_installation)
+  const kpiRowsAll=[
+    ...kpiRows.map(r=>({_type:'record',_date:kpiDate(r)})),
+    ...avisNoHk.map(a=>({_type:'avis',_date:kpiDateAvis(a)})),
+  ];
+  const kpiSemaine  = kpiRowsAll.filter(r=>r._date&&r._date>=kpiNow&&r._date<=kpiEndWeek);
+  const kpiMois     = kpiRowsAll.filter(r=>r._date&&r._date>=kpiNow&&r._date<=kpiEndMonth);
+  const kpiRetard   = kpiRowsAll.filter(r=>r._date&&r._date<kpiNow);
 
   const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>{
     const label = r.nom_entreprise_install || r.distributeur_hk || ((r.prenom_client||'')+' '+(r.nom_client||'')).trim() || '—';
@@ -2804,9 +2825,6 @@ function renderTableau(){
           <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter
         </button>
         ${isAdmin?`
-        <button class="btn btn-secondary" onclick="downloadTemplate()">
-          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
-        </button>
         <button class="btn btn-secondary" onclick="openImport()">
           <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer Excel
         </button>`:''}
@@ -3143,7 +3161,7 @@ function exportXLSX(){
       if(!ws[addr])continue;
       ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F2937'}},alignment:{horizontal:'center',wrapText:true}};
     }
-    XLSX.utils.book_append_sheet(wb,ws,'HK Tracker');
+    XLSX.utils.book_append_sheet(wb,ws,'Enviro-STEP');
     XLSX.writeFile(wb,'HK-Tracker_Export_'+nowStr()+'.xlsx');
     toast('Export XLSX téléchargé ✓');
   });
@@ -3663,9 +3681,6 @@ function renderAvisInstal(){
         <button class="btn btn-blue" onclick="exportAvisXLSX()" style="background:#217346;border-color:#217346">
           <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter
         </button>
-        <button class="btn btn-secondary" onclick="downloadAvisGabarit()">
-          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Gabarit XLSX
-        </button>
         <button class="btn btn-secondary" onclick="openAvisImport()">
           <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Importer XLSX
         </button>
@@ -3723,7 +3738,7 @@ function openAvisPopupById(avisId, e){
       ${section('Client','👤')}${row('Prénom',avis.prenom_client)}${row('Nom',avis.nom_client)}${row('Téléphone',avis.tel_client)}${row('Courriel',avis.courriel_client)}
       ${section('Installateur','🔧')}${row('Entreprise',avis.nom_entreprise_install)}${row('Courriel',avis.courriel_installateur)}${row('Téléphone',avis.tel_installateur)}
       ${section('Produits','📦')}${row('Produit principal',avis.produit_principal)}${row('Produit #2',avis.produit2)}${row('Produit #3',avis.produit3)}${row('Distributeur HK',avis.distributeur_hk)}
-      ${section('Autres informations','ℹ️')}${row('Firme technologue/ingénieur',avis.firme_technologue)}
+      ${section('Autres informations','ℹ️')}${row('Firme technologue/ingénieur',avis.firme_technologue||'—')}
     </div>`;
   overlay.style.display='flex';
 }
@@ -3811,7 +3826,7 @@ function openAvisPopup(noSerieHk, e){
       ${row('Note au distributeur', avis.note_distributeur)}
 
       ${section('Autres informations','ℹ️')}
-      ${row('Firme technologue/ingénieur', avis.firme_technologue)}
+      ${row('Firme technologue/ingénieur', avis.firme_technologue||'—')}
     </div>`;
 
   overlay.style.display='flex';
@@ -3977,6 +3992,7 @@ const UI_MAP = {
   'nom':'nom',
   'compagnie':'compagnie','entreprise':'compagnie',
   'ville':'ville',
+  'téléphone':'telephone','telephone':'telephone','tel':'telephone','tél':'telephone','no téléphone':'telephone','numéro de téléphone':'telephone',
   'courriel':'email','email':'email',
   'rôle':'role','role':'role',
   'entreprise':'entreprise','entreprises':'entreprise','entreprise (sans accès)':'entreprise',
@@ -4385,7 +4401,6 @@ function renderUsers(){
   const iconUp  ='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
   mkBtn('btn-primary',  'Ajouter',      iconAdd,  ()=>showUserForm('add'));
   mkBtn('btn-blue',     'Exporter',     iconXlsx, ()=>exportUsersXLSX(),'background:#217346;border-color:#217346');
-  mkBtn('btn-secondary','Gabarit XLSX', iconDl,   ()=>downloadUsersGabarit());
   mkBtn('btn-secondary','Importer XLSX',iconUp,   ()=>openUsersImport());
 
   main.onclick=function(e){
@@ -4546,8 +4561,7 @@ function renderEntreprisesTable(){
   const iDl ='<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
   const iUp ='<svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>';
   mkB('btn-primary',  'Ajouter',       iAdd, ()=>showUserForm('add'));
-  mkB('btn-blue',     'Exporter',   iXls, ()=>exportEntreprisesXLSX(),'background:#217346;border-color:#217346');
-  mkB('btn-secondary','Gabarit XLSX',  iDl,  ()=>downloadEntreprisesGabarit());
+  mkB('btn-blue',     'Exporter',      iXls, ()=>exportEntreprisesXLSX(),'background:#217346;border-color:#217346');
   mkB('btn-secondary','Importer XLSX', iUp,  ()=>openEntreprisesImport());
 }
 
