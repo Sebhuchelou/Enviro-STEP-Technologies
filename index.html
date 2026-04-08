@@ -1254,8 +1254,11 @@ function renderDashboard(){
   // Construire un index avis par no_serie_hk pour lookup rapide
   const avisMap={};
   (window.allAvisInstal||[]).forEach(a=>{if(a.no_serie_hk)avisMap[a.no_serie_hk]=a;});
-  // Pour les avis sans HK, chercher par assembleur_attribue
-  const avisNoHk=(window.allAvisInstal||[]).filter(a=>!a.no_serie_hk&&(a.assembleur_attribue||'')===(session.compagnie||''));
+  const avisNoHk=(window.allAvisInstal||[]).filter(a=>{
+    if(a.no_serie_hk) return false;
+    if(isDist) return (a.distributeur_hk||'')===(session.compagnie||'')||(a.assembleur_attribue||'')===(session.compagnie||'');
+    return (a.assembleur_attribue||'')===(session.compagnie||'');
+  });
   function kpiDate(r){
     // Priorité : date_livraison du record, sinon date_installation de l'avis lié
     if(r.date_livraison){const d=new Date(r.date_livraison+'T12:00:00');if(!isNaN(d))return d;}
@@ -2691,6 +2694,9 @@ const COLS_ASM=[
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_DIST=[
+  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
+  {k:'nom_distributeur',     l:'Nom du distributeur',                        ro:true},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur',                       ro:true},
   {k:'no_serie_hk',          l:'N° Série HK',                               hk:true, ro:true},
   {k:'produit_principal',    l:'Produit Principal',                          ro:true},
   {k:'produit2',             l:'Produit #2'},
@@ -2699,13 +2705,13 @@ const COLS_DIST=[
   {k:'nom_entrepreneur',     l:"Nom de l'entrepreneur"},
   {k:'nom_installateur',     l:'Installateur autorisé',                      ro:true},
   {k:'date_livraison',       l:'Date livraison assembleur',    t:'date',     ro:true},
-  {k:'nom_distributeur',     l:'Nom du distributeur',                        ro:true},
   {k:'date_livraison_dist',  l:'Date livraison distributeur',  t:'date'},
+  {k:'type_client',          l:"Type client", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'adresse_site',         l:"Adresse du site d'installation"},
   {k:'ville_livraison',      l:'Ville de livraison'},
+  {k:'notes_distributeur',   l:'Notes distributeur'},
   {k:'assembleur_dist',      l:'Assembleur/Distributeur',                    ro:true},
   {k:'identification_site',  l:"Identification du site d'installation",      ro:true},
-  {k:'notes_distributeur',   l:'Notes distributeur'},
   {k:'statut',               l:'Statut',                       t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
