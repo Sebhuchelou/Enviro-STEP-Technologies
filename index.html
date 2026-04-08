@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.1 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.2 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1277,23 +1277,53 @@ function renderCommentaires(){
   currentPanel='commentaires';
   const main=document.getElementById('app-main');
   main.innerHTML=`<div class="table-spinner"><div class="sp2"></div>Chargement des commentaires…</div>`;
-  FB.getDocs(FB.query(FB.collection(FB.db,'CommentaireAppli'),FB.orderBy('date_creation','desc')))
+  FB.getDocs(FB.query(FB.collection(FB.db,'CommentaireAppli')))
     .then(snap=>{
       const rows=[];
       snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+
+      // Tri : Nouveau → En cours → Terminé, puis date_creation desc
+      const statutOrder={'Nouveau':0,'En cours':1,'Terminé':2};
+      rows.sort((a,b)=>{
+        const sa=statutOrder[a.statut_suivi||'Nouveau']??0;
+        const sb=statutOrder[b.statut_suivi||'Nouveau']??0;
+        if(sa!==sb)return sa-sb;
+        return (b.date_creation?.seconds||0)-(a.date_creation?.seconds||0);
+      });
+
       const stars=n=>'★'.repeat(Math.max(0,Math.min(5,parseInt(n)||0)))+'☆'.repeat(5-Math.max(0,Math.min(5,parseInt(n)||0)));
-      const tRows=rows.length?rows.map(r=>`<tr>
+
+      const statutBadge=(id,s)=>{
+        const cur=s||'Nouveau';
+        const cfg={'Nouveau':['#fee2e2','#dc2626'],'En cours':['#fef3c7','#b45309'],'Terminé':['#dcfce7','#16a34a']};
+        const [bg,fg]=cfg[cur]||cfg['Nouveau'];
+        return `<select onchange="saveCommentaireField('${id}','statut_suivi',this.value)" style="padding:3px 8px;border-radius:4px;border:1px solid ${fg};background:${bg};color:${fg};font-size:11px;font-weight:700;font-family:var(--cond);cursor:pointer">
+          <option value="Nouveau"${cur==='Nouveau'?' selected':''}>🔴 Nouveau</option>
+          <option value="En cours"${cur==='En cours'?' selected':''}>🟡 En cours</option>
+          <option value="Terminé"${cur==='Terminé'?' selected':''}>🟢 Terminé</option>
+        </select>`;
+      };
+
+      const tRows=rows.length?rows.map(r=>`<tr id="comm-row-${r.id}">
+        <td class="td-actions" style="white-space:nowrap">
+          <button class="row-btn del-btn" onclick="deleteCommentaire('${r.id}')" title="Supprimer">🗑</button>
+        </td>
+        <td>${statutBadge(r.id, r.statut_suivi)}</td>
         <td style="font-weight:600">${esc(r.identification||'—')}</td>
         <td>${esc(r.nom||'—')}</td>
         <td>${esc(r.prenom||'—')}</td>
         <td><span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:#e0f2fe;color:#0369a1">${esc(r.role||'—')}</span></td>
         <td>${esc(r.compagnie||'—')}</td>
         <td style="color:var(--slate)">${esc(r.courriel||'—')}</td>
-        <td style="max-width:260px">${esc(r.votre_avis||'—')}</td>
-        <td style="text-align:center;color:#f59e0b;font-size:.9rem">${stars(r.note)}</td>
+        <td style="max-width:280px;white-space:normal;word-break:break-word;line-height:1.4">${esc(r.votre_avis||'—')}</td>
+        <td style="text-align:center;color:#f59e0b;font-size:.9rem;white-space:nowrap">${stars(r.note)}</td>
         <td style="white-space:nowrap;color:var(--slate);font-size:.8rem">${r.date_creation?new Date(r.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+        <td style="min-width:180px">
+          <textarea onblur="saveCommentaireField('${r.id}','suivi',this.value)" rows="2" placeholder="Notes de suivi…" style="width:100%;padding:5px 8px;border:1px solid var(--mist);border-radius:4px;font-size:.78rem;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(r.suivi||'')}</textarea>
+        </td>
       </tr>`).join('')
-      :`<tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><p>Aucun commentaire</p></div></td></tr>`;
+      :`<tr><td colspan="12"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><p>Aucun commentaire</p></div></td></tr>`;
+
       main.innerHTML=`
         <div class="page-header">
           <div><div class="page-title">💬 Commentaires Beta Test</div>
@@ -1301,11 +1331,32 @@ function renderCommentaires(){
         </div>
         <div class="tbl-card"><div class="tbl-scroll"><table>
           <thead><tr>
-            <th>Identification</th><th>Nom</th><th>Prénom</th><th>Rôle</th><th>Compagnie</th><th>Courriel</th><th>Avis</th><th style="text-align:center">Note</th><th>Date</th>
+            <th style="width:40px"></th>
+            <th>Statut</th>
+            <th>Identification</th><th>Nom</th><th>Prénom</th><th>Rôle</th><th>Compagnie</th><th>Courriel</th><th>Avis</th><th style="text-align:center">Note</th><th>Date</th><th>Suivi</th>
           </tr></thead>
           <tbody>${tRows}</tbody>
         </table></div></div>`;
     }).catch(e=>{main.innerHTML=`<div style="padding:40px;color:var(--err)">Erreur: ${esc(e.message)}</div>`;});
+}
+
+async function saveCommentaireField(id, field, value){
+  try{
+    await FB.updateDoc(FB.doc(FB.db,'CommentaireAppli',id),{[field]:value,updatedAt:FB.serverTimestamp()});
+  }catch(e){toast('Erreur sauvegarde: '+e.message,'err');}
+}
+
+function deleteCommentaire(id){
+  confirm2('Supprimer ce commentaire définitivement ?',async()=>{
+    setSyncing(true);
+    try{
+      await FB.deleteDoc(FB.doc(FB.db,'CommentaireAppli',id));
+      const row=document.getElementById('comm-row-'+id);
+      if(row)row.remove();
+      toast('Commentaire supprimé ✓','warn');
+    }catch(e){toast('Erreur: '+e.message,'err');}
+    setSyncing(false);
+  });
 }
 
 // ════════════════════════════════════════════════════════
@@ -2909,8 +2960,8 @@ function renderTableauFiltered(){
       <div class="tbl-scroll">
         <table>
           <thead><tr>
-            ${allCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
             <th>Actions</th>
+            ${allCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
           </tr></thead>
           <tbody>${tblRows}</tbody>
         </table>
@@ -2919,6 +2970,7 @@ function renderTableauFiltered(){
 }
 const STATUT_OPTS=['Avis d\'installation','Fabriqué','Livré vers distributeur','Livré vers entreprise'];
 const COLS_ADMIN=[
+  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
   {k:'po_assembleur',        l:'#PO Assembleur'},
   {k:'po_norweco',           l:'#PO Norweco'},
   {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
@@ -2944,7 +2996,6 @@ const COLS_ADMIN=[
   {k:'assembleur_dist',      l:'Assembleur/Distributeur'},
   {k:'identification_site',  l:"Identification du site d'installation"},
   {k:'statut',               l:'Statut', t:'sel', opts:STATUT_OPTS},
-  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
   {k:'derniere_modif',       l:'Dernière modification', t:'date'},
   {k:'dernier_utilisateur',  l:'Dernier utilisateur'},
 ];
@@ -3137,8 +3188,8 @@ function renderTableau(){
         <table>
           <thead><tr>
             ${isAdmin?`<th style="width:36px;padding:10px 8px"><input type="checkbox" id="chk-all" onclick="toggleSelectAll(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>`:''}
-            ${cols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
             <th>Actions</th>
+            ${cols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
           </tr></thead>
           <tbody id="tbl-body">
             ${rows.length?rows.map(r=>rowHtml(r,cols)).join(''):`<tr><td colspan="${cols.length+(isAdmin?2:1)}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`}
@@ -3181,7 +3232,7 @@ function rowHtml(row,cols){
     :isPseudo
     ?`<td class="td-actions"><span style="font-size:.72rem;color:var(--slate);padding:0 4px">Avis</span></td>`
     :`<td class="td-actions"><button class="row-btn edit-btn" onclick="startEdit('${row.id}')">✎</button>${isAdmin?`<button class="row-btn del-btn" onclick="deleteRow('${row.id}')">🗑</button>`:''}</td>`;
-  return`<tr id="row-${row.id}"${isE?' class="editing-row"':''}${selectedRows.has(row.id)?' style="background:#fff3cd"':''}>${chkCell}${cells}${actions}</tr>`;
+  return`<tr id="row-${row.id}"${isE?' class="editing-row"':''}${selectedRows.has(row.id)?' style="background:#fff3cd"':''}>${chkCell}${actions}${cells}</tr>`;
 }
 
 let selectedRows = new Set();
@@ -4630,17 +4681,17 @@ function renderUsers(){
       const col = roleColor[u.role]||'#607d8b';
       return`<tr ${sel?'style="background:#fff3cd"':''}>
         <td style="text-align:center;padding:8px"><input type="checkbox" ${sel?'checked':''} onchange="toggleUserSel('${u.id}')" style="cursor:pointer;width:15px;height:15px"/></td>
+        <td class="td-actions">
+          <button class="row-btn edit-btn" data-edit="${esc(u.id)}">✎</button>
+          ${u.id!==session.id&&u.actif!==false?`<button class="row-btn del-btn" data-del="${esc(u.id)}">🗑</button>`:''}
+          ${u.actif===false&&u.id!==session.id?`<button class="row-btn del-btn" data-permadel="${esc(u.id)}" style="background:var(--err);color:#fff">✕ BD</button>`:''}
+        </td>
         <td style="font-weight:600;color:var(--charcoal)">${esc(u.prenom||'')} ${esc(u.nom||'')}</td>
         <td>${esc(u.compagnie||'—')}</td>
         <td>${esc(u.ville||'—')}</td>
         <td style="color:var(--slate)">${esc(u.email||'—')}</td>
         <td><span style="padding:2px 9px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:${col}18;color:${col};border:1px solid ${col}33">${rl2[u.role]||u.role}</span></td>
         <td><span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);${u.actif===false?'background:#ffebee;color:#c62828;border:1px solid #fca5a5':'background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7'}">${u.actif===false?'Inactif':'Actif'}</span></td>
-        <td class="td-actions">
-          <button class="row-btn edit-btn" data-edit="${esc(u.id)}">✎</button>
-          ${u.id!==session.id&&u.actif!==false?`<button class="row-btn del-btn" data-del="${esc(u.id)}">🗑</button>`:''}
-          ${u.actif===false&&u.id!==session.id?`<button class="row-btn del-btn" data-permadel="${esc(u.id)}" style="background:var(--err);color:#fff">✕ BD</button>`:''}
-        </td>
       </tr>`;
     }).join('')
     :`<tr><td colspan="8"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun utilisateur</p></div></td></tr>`;
@@ -4656,7 +4707,7 @@ function renderUsers(){
         <table>
           <thead><tr>
             <th style="width:36px"><input type="checkbox" ${allChecked?'checked':''} onchange="toggleAllUsers(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>
-            <th>Nom</th><th>Compagnie</th><th>Ville</th><th>Courriel</th><th>Rôle</th><th>Statut</th><th>Actions</th>
+            <th>Actions</th><th>Nom</th><th>Compagnie</th><th>Ville</th><th>Courriel</th><th>Rôle</th><th>Statut</th>
           </tr></thead>
           <tbody>${tRows}</tbody>
         </table>
@@ -5121,11 +5172,11 @@ async function saveUserForm(){
 
 function deleteUserPermanent(id){
   const u=allUsers.find(x=>x.id===id);if(!u)return;
-  confirm2(`Supprimer définitivement ${u.prenom} ${u.nom} (${u.email}) de Firestore ?\nCette action est irréversible.\nNote : supprimez aussi le compte dans la console Firebase Authentication.`,async()=>{
+  confirm2(`Supprimer définitivement ${u.prenom} ${u.nom} (${u.email}) de Firestore ?\n\n⚠️ Cette action supprime le profil Firestore.\nPour supprimer aussi le compte de connexion, allez dans la console Firebase Auth et supprimez l'email ${u.email}.`,async()=>{
     setSyncing(true);
     try{
       await FB.deleteDoc(FB.doc(FB.db,'users',id));
-      toast('Utilisateur supprimé définitivement de Firestore','warn');
+      toast('Profil Firestore supprimé ✓  —  Pensez à supprimer le compte Auth dans la console Firebase','warn',7000);
     }catch(e){toast('Erreur: '+e.message,'err')}
     setSyncing(false);
   });
