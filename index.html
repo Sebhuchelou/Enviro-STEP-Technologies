@@ -2498,9 +2498,16 @@ function renderTableauFiltered(){
     const endOfWeek=new Date(now); endOfWeek.setDate(now.getDate()+(6-now.getDay()));
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
     function pd2(s){if(!s)return null;const d=new Date(s+'T12:00:00');return isNaN(d)?null:d;}
+    // Lookup avis par HK pour fallback date_installation
+    const avisMapView={};
+    (window.allAvisInstal||[]).forEach(a=>{if(a.no_serie_hk)avisMapView[a.no_serie_hk]=a;});
     function livDate(r){
+      if(r._fromAvis) return pd2(r.date_livraison); // pseudo-record : date_livraison = date_installation
       if(r.date_livraison){const d=pd2(r.date_livraison);if(d)return d;}
       if(r.date_livraison_dist){const d=pd2(r.date_livraison_dist);if(d)return d;}
+      // Fallback : date_installation de l'avis lié
+      const avis=r.no_serie_hk?avisMapView[r.no_serie_hk]:null;
+      if(avis?.date_installation){const d=pd2(avis.date_installation);if(d)return d;}
       return null;
     }
     // Avis sans HK (filtrés selon rôle)
