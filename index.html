@@ -854,7 +854,12 @@ async function doLogin(){
       spinner.style.display='none'; btn.disabled=false; return;
     }
 
-    if(userDoc.role !== pendingRole){
+    // Le bouton "Administration & Comptabilité" utilise pendingRole='administrateur'
+    // On autorise aussi le rôle comptabilite par ce même bouton
+    const rolesAutorises = pendingRole==='administrateur'
+      ? ['administrateur','comptabilite']
+      : [pendingRole];
+    if(!rolesAutorises.includes(userDoc.role)){
       await FB.signOut(FB.auth);
       errEl.textContent='Accès non autorisé pour ce rôle.';
       errEl.style.display='block';
@@ -2493,13 +2498,47 @@ function renderTableauFiltered(){
     const endOfWeek=new Date(now); endOfWeek.setDate(now.getDate()+(6-now.getDay()));
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
     function pd2(s){if(!s)return null;const d=new Date(s+'T12:00:00');return isNaN(d)?null:d;}
-    function livDate(r){return pd2(r.date_livraison)||pd2(r.date_livraison_dist);}
+    function livDate(r){
+      if(r.date_livraison){const d=pd2(r.date_livraison);if(d)return d;}
+      if(r.date_livraison_dist){const d=pd2(r.date_livraison_dist);if(d)return d;}
+      return null;
+    }
+    // Avis sans HK (filtrés selon rôle)
+    const isDist2=session.role==='distributeur';
+    const avisNoHkView=(window.allAvisInstal||[]).filter(a=>{
+      if(a.no_serie_hk) return false;
+      if(isDist2) return (a.distributeur_hk||'')===(session.compagnie||'')||(a.assembleur_attribue||'')===(session.compagnie||'');
+      return (a.assembleur_attribue||'')===(session.compagnie||'');
+    });
+    // Convertir les avis sans HK en pseudo-records pour l'affichage
+    function avisToRecord(a){
+      return {
+        id:a.id, _fromAvis:true,
+        no_serie_hk:'', statut:"Avis d'installation",
+        nom_assembleur:a.assembleur_attribue||'',
+        nom_distributeur:a.distributeur_hk||'',
+        produit_principal:a.produit_principal||'',
+        produit2:a.produit2||'', produit3:a.produit3||'',
+        nom_entrepreneur:a.nom_entreprise_install||a.nom_entrepreneur||'',
+        nom_installateur:a.nom_entreprise_install||'',
+        conseiller:a.conseiller_regional||'',
+        date_livraison:a.date_installation||'',
+        adresse_site:a.no_civique_rue||'', ville_livraison:a.ville_site||'',
+        identification_site:a.identification_site||'',
+      };
+    }
     if(asmView==='semaine'){
-      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfWeek;});
+      const recRows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfWeek;});
+      const avisRows=avisNoHkView.filter(a=>{const d=pd2(a.date_installation);return d&&d>=now&&d<=endOfWeek;}).map(avisToRecord);
+      rows=[...recRows,...avisRows];
     } else if(asmView==='mois_kpi'){
-      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfMonth;});
+      const recRows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>=now&&d<=endOfMonth;});
+      const avisRows=avisNoHkView.filter(a=>{const d=pd2(a.date_installation);return d&&d>=now&&d<=endOfMonth;}).map(avisToRecord);
+      rows=[...recRows,...avisRows];
     } else if(asmView==='retard'){
-      rows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d<now;});
+      const recRows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d<now;});
+      const avisRows=avisNoHkView.filter(a=>{const d=pd2(a.date_installation);return d&&d<now;}).map(avisToRecord);
+      rows=[...recRows,...avisRows];
     }
   }
   const allCols=getCols();
