@@ -1476,16 +1476,15 @@ function renderConseillerDashboard(){
                 <span style="font-size:.78rem;font-weight:600;color:#7e22ce">🎁 Éligibles au cadeau (≥ 10 HP)</span>
                 <span style="font-family:var(--cond);font-size:1.3rem;font-weight:800;color:#7c3aed">${eligible_cadeau.length}</span>
               </button>
+              ${proche_credit.length?`<button onclick="renderHydroPrimeTable('proche_credit')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;cursor:pointer;text-align:left;width:100%">
+                <span style="font-size:.78rem;font-weight:600;color:#c2410c">💵 À 1 Hydro-Prime du crédit (4/5)</span>
+                <span style="font-family:var(--cond);font-size:1.3rem;font-weight:800;color:#c2410c">${proche_credit.length}</span>
+              </button>`:''}
+              ${proche_cadeau.length?`<button onclick="renderHydroPrimeTable('proche_cadeau')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fdf4ff;border:2px solid #c084fc;border-radius:6px;cursor:pointer;text-align:left;width:100%">
+                <span style="font-size:.78rem;font-weight:600;color:#7e22ce">🎁 À 1 Hydro-Prime du cadeau (9/10)</span>
+                <span style="font-family:var(--cond);font-size:1.3rem;font-weight:800;color:#7c3aed">${proche_cadeau.length}</span>
+              </button>`:''}
             </div>
-            <!-- Alertes proche seuil -->
-            ${proche_credit.length?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:8px 12px;margin-bottom:8px">
-              <div style="font-size:.71rem;font-weight:700;color:#c2410c;margin-bottom:4px">💵 À 1 Hydro-Prime du crédit</div>
-              ${proche_credit.map(r=>`<div onclick="openHpPopup('${r.nom_entreprise.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','restants',${r.hp_utilises||0})" style="font-size:.75rem;color:#9a3412;font-weight:600;padding:1px 0;cursor:pointer;text-decoration:underline">${esc(r.nom_entreprise)}</div>`).join('')}
-            </div>`:''}
-            ${proche_cadeau.length?`<div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:6px;padding:8px 12px;margin-bottom:8px">
-              <div style="font-size:.71rem;font-weight:700;color:#7e22ce;margin-bottom:4px">🎁 À 1 Hydro-Prime du cadeau</div>
-              ${proche_cadeau.map(r=>`<div onclick="openHpPopup('${r.nom_entreprise.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','restants',${r.hp_utilises||0})" style="font-size:.75rem;color:#6b21a8;font-weight:600;padding:1px 0;cursor:pointer;text-decoration:underline">${esc(r.nom_entreprise)}</div>`).join('')}
-            </div>`:''}
             <div style="font-size:.7rem;color:var(--slate);margin-bottom:12px">5 HP min. = crédit (100 $/HP) &nbsp;|&nbsp; 10 HP min. = cadeau (~2 000 $)</div>
             <button onclick="renderHydroPrimeTable()" style="width:100%;padding:8px;border-radius:var(--r);border:2px solid #f59e0b;background:transparent;color:#b45309;font-family:var(--cond);font-size:.75rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">Voir les ${allHP.length} entreprises →</button>`;
           })()}
@@ -1686,9 +1685,11 @@ function openHpPopup(nomEntreprise, type, hpUtilises){
 function renderHydroPrimeTable(filtre){
   const allHP=window.allHydroPrime||[];
   let sorted=[...allHP].sort((a,b)=>(a.nom_entreprise||'').localeCompare(b.nom_entreprise||'','fr'));
-  if(filtre==='credit') sorted=sorted.filter(r=>(r.hp_restants||0)>=5);
-  if(filtre==='cadeau') sorted=sorted.filter(r=>(r.hp_restants||0)>=10);
-  const titreFiltre=filtre==='credit'?' — Éligibles crédit (≥5 HP)':filtre==='cadeau'?' — Éligibles cadeau (≥10 HP)':'';
+  if(filtre==='credit')         sorted=sorted.filter(r=>(r.hp_restants||0)>=5);
+  if(filtre==='cadeau')         sorted=sorted.filter(r=>(r.hp_restants||0)>=10);
+  if(filtre==='proche_credit')  sorted=sorted.filter(r=>(r.hp_restants||0)===4);
+  if(filtre==='proche_cadeau')  sorted=sorted.filter(r=>(r.hp_restants||0)===9);
+  const titreFiltre=filtre==='credit'?' — Éligibles crédit (≥5 HP)':filtre==='cadeau'?' — Éligibles cadeau (≥10 HP)':filtre==='proche_credit'?' — À 1 HP du crédit':filtre==='proche_cadeau'?' — À 1 HP du cadeau':'';
 
   const rows=sorted.length?sorted.map(r=>{
     const isE=editingId===r.id;
@@ -1793,13 +1794,16 @@ async function loadAvisNonLivresMap(avisNonLivres){
   }
 
   function initAvisMap(){
-    container.innerHTML='<div id="avis-nl-map" style="height:100%;width:100%;min-height:480px"></div>';
-    const map=window.L.map('avis-nl-map').setView([46.8,-71.2],7);
-    // Forcer Leaflet à recalculer la taille après rendu
-    setTimeout(()=>map.invalidateSize(),200);
+    // Mesurer la hauteur réelle du conteneur
+    const h = container.offsetHeight || 480;
+    container.innerHTML=`<div id="avis-nl-map" style="height:${h}px;width:100%"></div>`;
+    const map=window.L.map('avis-nl-map',{preferCanvas:true}).setView([46.8,-71.2],7);
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
       attribution:'© OpenStreetMap',maxZoom:18
     }).addTo(map);
+    // Forcer le recalcul de taille plusieurs fois
+    setTimeout(()=>map.invalidateSize(),100);
+    setTimeout(()=>map.invalidateSize(),500);
 
     if(!window._geocache) window._geocache={};
 
@@ -1827,7 +1831,7 @@ async function loadAvisNonLivresMap(avisNonLivres){
     const bounds=[];
     (async()=>{
       for(const avis of avisNonLivres){
-        const ville=avis.ville_site||'';
+        const ville=(avis.ville_site||'').trim();
         const adresse=avis.no_civique_rue?`${avis.no_civique_rue}, ${ville}`:ville;
         if(!ville) continue;
         let pos=adresse.length>ville.length?await geocode(adresse+', Québec, Canada'):null;
@@ -1842,11 +1846,14 @@ async function loadAvisNonLivresMap(avisNonLivres){
             .addTo(map)
             .bindPopup(`<b>${esc(nom)}</b><br>${esc(ville)}${avis.date_installation?'<br>📅 '+esc(avis.date_installation):''}<br><span style="font-size:11px;color:#0369a1">${esc(statut)}</span>${isRetard?'<br><span style="color:#dc2626;font-size:11px">⚠ Date passée</span>':''}`);
           bounds.push([pos.lat,pos.lng]);
-          if(bounds.length>1) map.fitBounds(bounds,{padding:[20,20]});
+          if(bounds.length===1) map.setView([pos.lat,pos.lng],8);
+          else map.fitBounds(bounds,{padding:[20,20]});
+          // Invalider après chaque marqueur ajouté
+          map.invalidateSize();
           await new Promise(r=>setTimeout(r,1200));
         }
       }
-      if(bounds.length===1) map.setView(bounds[0],11);
+      if(!bounds.length) map.setView([46.8,-71.2],7);
     })();
   }
 
