@@ -4465,6 +4465,11 @@ function renderEntreprisesTable(){
   const hasSelEnt=selectedEntreprises.size>0;
   const allChecked=rows.length>0&&rows.every(r=>selectedEntreprises.has(r.id));
 
+  const conseillerOpts=(selected='')=>`<option value="">— Non attribué —</option>`+
+    (allUsers||[]).filter(x=>x.role==='conseiller'&&x.actif!==false)
+      .map(x=>{const n=((x.prenom||'')+' '+(x.nom||'')).trim();return`<option value="${esc(n)}"${n===selected?' selected':''}>${esc(n)}</option>`;})
+      .join('');
+
   const tblRows=rows.length?rows.map(r=>{
     const isE=editingId===r.id;
     const sel=selectedEntreprises.has(r.id);
@@ -4475,10 +4480,10 @@ function renderEntreprisesTable(){
       <td>${isE?`<input id="ent-ville" value="${esc(r.ville||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.ville||'—')}</td>
       <td>${isE?`<input id="ent-tel" value="${esc(r.telephone||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.telephone||'—')}</td>
       <td>${isE?`<input id="ent-email" value="${esc(r.email||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.email||'—')}</td>
-      <td>${isE?`<select id="ent-cons" style="width:100%;padding:5px 8px;border:1px solid #e9d5ff;border-radius:3px;font-size:.83rem;background:#fdf4ff"><option value="">— Non attribué —</option>${(allUsers||[]).filter(x=>x.role==='conseiller'&&x.actif!==false).map(x=>{const n=((x.prenom||'')+' '+(x.nom||'')).trim();return`<option value="${esc(n)}"${n===(r.conseiller_attribue||'')?'selected':''}>${esc(n)}</option>`}).join('')}</select>`:esc(r.conseiller_attribue||'—')}</td>
-      <td>${isE?`<select id="ent-conseiller" style="width:100%;padding:5px 8px;border:1px solid #e9d5ff;border-radius:3px;font-size:.83rem;background:#fdf4ff">${
-        '<option value="">— Non attribué —</option>'+(allUsers||[]).filter(u=>(u.role==='conseiller')&&u.actif!==false).map(u=>{const n=((u.prenom||'')+' '+(u.nom||'')).trim();return`<option value="${esc(n)}"${n===(r.conseiller_attribue||'')?'  selected':''}>${esc(n)}</option>`;}).join('')
-      }</select>`:(`<span style="font-size:.78rem;color:#7c3aed">${esc(r.conseiller_attribue||'—')}</span>`)}</td>
+      <td>${isE
+        ?`<select id="ent-cons" style="width:100%;padding:5px 8px;border:1px solid #e9d5ff;border-radius:3px;font-size:.83rem;background:#fdf4ff">${conseillerOpts(r.conseiller_attribue||'')}</select>`
+        :`<span style="font-size:.78rem;color:#7c3aed;font-weight:600">${esc(r.conseiller_attribue||'—')}</span>`}
+      </td>
       <td style="text-align:center">
         <span onclick="openHpPopup('${esc(r.compagnie||'').replace(/'/g,"\\'")}','cumules')" style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:#b45309;background:#fffbeb;padding:2px 9px;border-radius:4px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fffbeb'">${r.hp_cumules}</span>
       </td>
@@ -4521,10 +4526,11 @@ function renderEntreprisesTable(){
         <table>
           <thead><tr>
             <th style="width:36px"><input type="checkbox" ${allChecked?'checked':''} onchange="toggleAllEnt(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>
-            <th>Compagnie</th><th>Ville</th><th>Téléphone</th><th>Courriel</th><th>Conseiller</th><th>Conseiller</th>
-            <th style="text-align:center;background:#fffbeb;color:#b45309">Hydro-Primes cumulés</th>
-            <th style="text-align:center;background:#fef2f2;color:#dc2626">Hydro-Primes utilisés ✎</th>
-            <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">Hydro-Primes restants</th>
+            <th>Compagnie</th><th>Ville</th><th>Téléphone</th><th>Courriel</th>
+            <th style="color:#7c3aed">Conseiller attribué</th>
+            <th style="text-align:center;background:#fffbeb;color:#b45309">HP Cumulés</th>
+            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés ✎</th>
+            <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">HP Restants</th>
             <th>Actions</th>
           </tr></thead>
           <tbody>${tblRows}</tbody>
@@ -4599,17 +4605,21 @@ function exportEntreprisesXLSX(){
   loadXLSX(()=>{
     const allHP=window.allHydroPrime||[];
     const rows=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
-    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes cumulés','Hydro-Primes utilisés','Hydro-Primes restants','Conseiller attribué'];
+    const headers=['Compagnie','Ville','Téléphone','Courriel','Conseiller attribué','HP Cumulés','HP Utilisés','HP Restants'];
     const data=rows.map(u=>{
       const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
-      return[u.compagnie||'',u.ville||'',u.telephone||'',u.email||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0,u.conseiller_attribue||''];
+      return[u.compagnie||'',u.ville||'',u.telephone||'',u.email||'',u.conseiller_attribue||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0];
     });
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:14},{wch:14},{wch:24}];
+    ws['!cols']=[{wch:28},{wch:16},{wch:16},{wch:30},{wch:24},{wch:12},{wch:12},{wch:12}];
     const range=XLSX.utils.decode_range(ws['!ref']);
-    for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
-    XLSX.utils.book_append_sheet(wb,ws,'Entreprises Hydro-Prime');
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Entreprises HP');
     XLSX.writeFile(wb,'HK-Entreprises-HP_'+nowStr()+'.xlsx');
     toast('Export XLSX téléchargé ✓');
   });
@@ -4617,25 +4627,37 @@ function exportEntreprisesXLSX(){
 
 function downloadEntreprisesGabarit(){
   loadXLSX(()=>{
-    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes utilisés','Conseiller attribué'];
-    const example=[['Excavation Martin inc.','Lévis','418-555-0101','martin@excavation.ca','0','Jean Tremblay'],['Béton Lavoie','Québec','418-555-0202','lavoie@beton.ca','5','Marie Gagnon']];
+    const headers=['Compagnie','Ville','Téléphone','Courriel','Conseiller attribué','HP Utilisés'];
+    const example=[
+      ['Excavation Martin inc.','Lévis','418-555-0101','martin@excavation.ca','Jean Tremblay','0'],
+      ['Béton Lavoie','Québec','418-555-0202','lavoie@beton.ca','Marie Gagnon','5'],
+    ];
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
-    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:24}];
+    ws['!cols']=[{wch:28},{wch:16},{wch:16},{wch:30},{wch:24},{wch:14}];
     const range=XLSX.utils.decode_range(ws['!ref']);
-    for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(!ws[addr])continue;
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};
+    }
     const wsNote=XLSX.utils.aoa_to_sheet([
-      ['INSTRUCTIONS'],[''],
+      ['INSTRUCTIONS GABARIT — Entreprises & Hydro-Prime'],[''],
       ['Champ','Description','Obligatoire ?'],
-      ['Compagnie','Nom exact de l\'entreprise','Oui'],
-      ['Ville','Ville','Non'],['Téléphone','Numéro','Non'],['Courriel','Adresse courriel','Non'],
-      ['Hydro-Primes utilisés','Hydro-Primes déjà convertis (crédit ou cadeau)','Non — défaut 0'],[''],
-      ['ℹ Hydro-Primes cumulés','Calculé auto : nombre d\'installations livrées',''],
-      ['ℹ Hydro-Primes restants','Calculé auto : Cumulés − Utilisés',''],
-      ['ℹ Règles','5 Hydro-Primes min. crédit (1 Hydro-Prime = 100 $) | 10 Hydro-Primes min. cadeau (~2 000 $)',''],
+      ['Compagnie','Nom exact de l\'entreprise installateur','Oui'],
+      ['Ville','Ville de l\'entreprise','Non'],
+      ['Téléphone','Numéro de téléphone','Non'],
+      ['Courriel','Adresse courriel','Non'],
+      ['Conseiller attribué','Prénom + Nom du conseiller (ex. Jean Tremblay)','Non'],
+      ['HP Utilisés','Hydro-Primes déjà convertis en crédit ou cadeau','Non — défaut 0'],
+      [''],
+      ['ℹ HP Cumulés','Calculé automatiquement : nb d\'installations livrées',''],
+      ['ℹ HP Restants','Calculé automatiquement : HP Cumulés − HP Utilisés',''],
+      ['ℹ Règles','5 HP min. = crédit (1 HP = 100 $)  |  10 HP min. = cadeau (~2 000 $)',''],
     ]);
-    wsNote['!cols']=[{wch:22},{wch:60},{wch:20}];
-    XLSX.utils.book_append_sheet(wb,ws,'Gabarit');XLSX.utils.book_append_sheet(wb,wsNote,'Instructions');
+    wsNote['!cols']=[{wch:22},{wch:60},{wch:24}];
+    XLSX.utils.book_append_sheet(wb,ws,'Gabarit');
+    XLSX.utils.book_append_sheet(wb,wsNote,'Instructions');
     XLSX.writeFile(wb,'HK-Gabarit-Entreprises-HP.xlsx');
     toast('Gabarit téléchargé ✓');
   });
