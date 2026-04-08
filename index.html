@@ -6,6 +6,8 @@
 <title>Enviro-STEP — Suivi Assemblages</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init('kUsvgD1cHWbeipRis');</script>
 
 <!-- Firebase SDK -->
 <script type="module">
@@ -590,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.0 - Développée par SHU</span>
+        <span>Page test développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1384,7 +1386,24 @@ async function submitFeedback(){
       prenom:         session.prenom||'',
       date_creation:  FB.serverTimestamp(),
     });
-    // Fermer le popup et afficher le message de remerciement
+
+    // Envoyer le courriel de notification via EmailJS
+    const stars='★'.repeat(note)+'☆'.repeat(5-note);
+    try{
+      await emailjs.send('service_qsuaoxs','template_mjomdwh',{
+        identification: nom,
+        votre_avis:     avis,
+        note:           note+'/5 '+stars,
+        role:           session.role||'—',
+        compagnie:      session.compagnie||'—',
+        courriel:       session.email||'—',
+        date:           new Date().toLocaleString('fr-CA',{dateStyle:'short',timeStyle:'short'}),
+      });
+    }catch(emailErr){
+      console.warn('EmailJS non envoyé:',emailErr);
+      // Ne pas bloquer — le commentaire est déjà sauvegardé dans Firestore
+    }
+
     document.getElementById('attr-overlay').style.display='none';
     toast('Merci pour votre commentaire nous permettant d\'améliorer l\'expérience. Bonne journée. 🙏','ok',5000);
   }catch(e){toast('Erreur lors de l\'envoi: '+e.message,'err');}
