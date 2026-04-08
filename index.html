@@ -581,7 +581,7 @@ tbody tr:hover{background:#f8fbf5;}
       <div class="home-secondary-actions">
         <button type="button" class="home-secondary-btn" onclick="openLogin('administrateur')">
           <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          Administration &amp; Comptabilité
+          Administration
         </button>
         <button type="button" class="home-secondary-btn" onclick="openLogin('conseiller')">
           <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
@@ -786,8 +786,8 @@ const ROLE_META={
   assembleur:   {title:'Espace Assembleur',   sub:'Réservé aux assembleurs autorisés',       color:'#4caf1a', modal:''},
   distributeur: {title:'Espace Distributeur', sub:'Réservé aux distributeurs autorisés',     color:'#1b5fa8', modal:'border-blue'},
   conseiller:   {title:'Espace Conseiller',   sub:'Lecture des fiches par MRC attribuées',   color:'#7c3aed', modal:''},
-  administrateur:{title:'Administration & Comptabilité', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#1e2530', modal:'border-dark'},
-  comptabilite:  {title:'Administration & Comptabilité', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#0f766e', modal:'border-dark'},
+  administrateur:{title:'Administration', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#1e2530', modal:'border-dark'},
+  comptabilite:  {title:'Administration', sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#0f766e', modal:'border-dark'},
 };
 
 function openLogin(role){
@@ -951,7 +951,7 @@ function startListeners(){
   unsubRecords = FB.onSnapshot(recQuery, snap=>{
     allRecords=[];
     snap.forEach(d=>allRecords.push({id:d.id,...d.data()}));
-    if(currentPanel==='tableau') renderTableau();
+    if(currentPanel==='tableau') { if(asmView) renderTableauFiltered(); else renderTableau(); }
     else if(currentPanel==='dashboard') renderDashboard();
   }, err=>{ toast('Erreur lecture données: '+err.message,'err'); });
 
@@ -1664,10 +1664,13 @@ function renderConseillerDashboard(){
   }, 100);
 }
 
-// ── Créer entreprise depuis dashboard conseiller ──────
 function openCreateEntrepriseModal(nomEntreprise, ville){
   const overlay=document.getElementById('attr-overlay');
   if(!overlay)return;
+  const consNom=((session.prenom||'')+' '+(session.nom||'')).trim();
+  // Liste des conseillers actifs
+  const conseillers=(allUsers||[]).filter(u=>u.role==='conseiller'&&u.actif!==false).map(u=>((u.prenom||'')+' '+(u.nom||'')).trim()).filter(Boolean).sort();
+  const consOpts='<option value="">— Non attribué —</option>'+conseillers.map(c=>`<option value="${esc(c)}"${c===consNom?' selected':''}>${esc(c)}</option>`).join('');
 
   overlay.innerHTML=`
     <div style="background:#fff;border-radius:8px;width:100%;max-width:520px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid #7c3aed">
@@ -1687,6 +1690,8 @@ function openCreateEntrepriseModal(nomEntreprise, ville){
           <input id="ce-tel" value="" placeholder="418-555-0000" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
         <div><label style="font-size:.72rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Courriel</label>
           <input id="ce-email" type="email" value="" placeholder="contact@entreprise.ca" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.85rem;margin-top:4px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px">Conseiller attribué</label>
+          <select id="ce-conseiller" style="width:100%;padding:8px 10px;border:1px solid #e9d5ff;border-radius:var(--r);font-size:.85rem;margin-top:4px;background:#fdf4ff;box-sizing:border-box">${consOpts}</select></div>
       </div>
       <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
         <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
@@ -1701,12 +1706,12 @@ async function confirmCreateEntreprise(){
   const ville= document.getElementById('ce-ville')?.value.trim()||'';
   const tel  = document.getElementById('ce-tel')?.value.trim()||'';
   const email= document.getElementById('ce-email')?.value.trim()||'';
+  const cons = document.getElementById('ce-conseiller')?.value||'';
   if(!co){toast('Compagnie requise','err');return;}
   setSyncing(true);
   try{
-    // Créer user entreprise
     await FB.addDoc(FB.collection(FB.db,'users'),{
-      compagnie:co, ville, telephone:tel, email,
+      compagnie:co, ville, telephone:tel, email, conseiller_attribue:cons,
       role:'entreprise', actif:true,
       prenom:'', nom:'',
       createdAt:FB.serverTimestamp(), updatedAt:FB.serverTimestamp()
@@ -2442,6 +2447,7 @@ async function confirmAttribution(){
 }
 
 function renderTableauFiltered(){
+  currentPanel='tableau'; // Permet au listener de re-rendre ici après saveRow
   const statutMap={
     stock:     ['Fabriqué'],
     avis:      ["Avis d'installation"],
@@ -2755,6 +2761,7 @@ const COLS_DIST=[
   {k:'statut',               l:'Statut',                       t:'sel', opts:STATUT_OPTS},
 ];
 const COLS_CONS=[
+  {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link',                            ro:true},
   {k:'po_assembleur',        l:'#PO Assembleur',                                               ro:true},
   {k:'po_norweco',           l:'#PO Norweco',                                                  ro:true},
   {k:'nom_assembleur',       l:"Nom de l'Assembleur",                                          ro:true},
@@ -2857,7 +2864,7 @@ function renderTableau(){
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px">
-        ${isCons?`<button onclick="renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Tableau de bord</button>`:''}
+        ${isCons?`<button onclick="asmView=null;currentPanel='dashboard';renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Tableau de bord</button>`:''}
         <div>
           <div class="page-title">${isAdmin?'Tableau de suivi global':session.role==='assembleur'?'Mes assemblages':session.role==='conseiller'?'Tableau de suivi — Mes dossiers':'Mes livraisons'}</div>
           <div class="page-sub">Données Firebase en temps réel — ${rows.length} enregistrement${rows.length!==1?'s':''}</div>
@@ -2936,8 +2943,11 @@ function rowHtml(row,cols){
     return`<td>${esc(v)||'—'}</td>`;
   }).join('');
   const isCons=session.role==='conseiller';
+  const isPseudo=!!row._fromAvis; // avis sans HK converti en pseudo-record
   const actions=isE
     ?`<td class="td-actions"><button class="row-btn save-btn" onclick="saveRow('${row.id}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="cancelEdit()">✕</button></td>`
+    :isPseudo
+    ?`<td class="td-actions"><span style="font-size:.72rem;color:var(--slate);padding:0 4px">Avis</span></td>`
     :`<td class="td-actions"><button class="row-btn edit-btn" onclick="startEdit('${row.id}')">✎</button>${isAdmin?`<button class="row-btn del-btn" onclick="deleteRow('${row.id}')">🗑</button>`:''}</td>`;
   return`<tr id="row-${row.id}"${isE?' class="editing-row"':''}${selectedRows.has(row.id)?' style="background:#fff3cd"':''}>${chkCell}${cells}${actions}</tr>`;
 }
@@ -3003,10 +3013,11 @@ function deleteSelected(){
 
 function startEdit(id){
   const row=allRecords.find(r=>r.id===id);if(!row)return;
-  editBuf={...row};editingId=id;renderTableau();
+  editBuf={...row};editingId=id;
+  if(asmView) renderTableauFiltered(); else renderTableau();
   setTimeout(()=>{const el=document.getElementById('row-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'})},50);
 }
-function cancelEdit(){editingId=null;editBuf={};renderTableau()}
+function cancelEdit(){editingId=null;editBuf={};if(asmView) renderTableauFiltered(); else renderTableau();}
 
 async function saveRow(id){
   // Doublon HK check
