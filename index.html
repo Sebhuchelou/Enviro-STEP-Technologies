@@ -1185,7 +1185,7 @@ function renderDashboard(){
   const isDist = session.role==='distributeur';
   const allMyRows = allRecords.filter(r=>
     isDist
-      ? (r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie)
+      ? r.nom_distributeur===session.compagnie
       : r.nom_assembleur===session.compagnie
   );
 
@@ -1195,10 +1195,7 @@ function renderDashboard(){
 
   const allAvisData = window.allAvisInstal||[];
   const avisMe = isDist
-    ? allAvisData.filter(r=> !r.no_serie_hk && (
-        (r.distributeur_hk||'')===(session.compagnie||'') ||
-        (r.assembleur_attribue||'')===(session.compagnie||'')
-      ))
+    ? allAvisData.filter(r=> !r.no_serie_hk && (r.distributeur_hk||'')===(session.compagnie||''))
     : allAvisData.filter(r=>
         (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk
       );
@@ -1261,7 +1258,7 @@ function renderDashboard(){
   (window.allAvisInstal||[]).forEach(a=>{if(a.no_serie_hk)avisMap[a.no_serie_hk]=a;});
   const avisNoHk=(window.allAvisInstal||[]).filter(a=>{
     if(a.no_serie_hk) return false;
-    if(isDist) return (a.distributeur_hk||'')===(session.compagnie||'')||(a.assembleur_attribue||'')===(session.compagnie||'');
+    if(isDist) return (a.distributeur_hk||'')===(session.compagnie||'');
     return (a.assembleur_attribue||'')===(session.compagnie||'');
   });
   function kpiDate(r){
@@ -2514,7 +2511,7 @@ function renderTableauFiltered(){
     const isDist2=session.role==='distributeur';
     const avisNoHkView=(window.allAvisInstal||[]).filter(a=>{
       if(a.no_serie_hk) return false;
-      if(isDist2) return (a.distributeur_hk||'')===(session.compagnie||'')||(a.assembleur_attribue||'')===(session.compagnie||'');
+      if(isDist2) return (a.distributeur_hk||'')===(session.compagnie||'');
       return (a.assembleur_attribue||'')===(session.compagnie||'');
     });
     // Convertir les avis sans HK en pseudo-records pour l'affichage
@@ -2554,10 +2551,7 @@ function renderTableauFiltered(){
   if(asmView==='avis'){
     const isDist = session.role==='distributeur';
     const allAvis = (window.allAvisInstal||[]).filter(r=>{
-      if(isDist) return !r.no_serie_hk && (
-        (r.distributeur_hk||'')===(session.compagnie||'') ||
-        (r.assembleur_attribue||'')===(session.compagnie||'')
-      );
+      if(isDist) return !r.no_serie_hk && (r.distributeur_hk||'')===(session.compagnie||'');
       return (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk;
     });
     const hkDispo = !isDist ? getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort() : [];
@@ -2796,8 +2790,8 @@ function getRows(){
   let rows=[...allRecords];
   if(session.role==='assembleur')rows=rows.filter(r=>r.nom_assembleur===session.compagnie);
   else if(session.role==='distributeur'){
-    rows=rows.filter(r=>r.nom_distributeur===session.compagnie||r.assembleur_dist===session.compagnie);
-    if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab||r.assembleur_dist===activeAsmTab);
+    rows=rows.filter(r=>r.nom_distributeur===session.compagnie);
+    if(activeAsmTab!=='__all__') rows=rows.filter(r=>r.nom_assembleur===activeAsmTab);
   }
   else if(session.role==='conseiller'){
     const consNom=((session.prenom||'')+' '+(session.nom||'')).trim();
