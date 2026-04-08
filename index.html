@@ -717,25 +717,37 @@ window.addEventListener('firebase-ready', async () => {
     }
   });
 
-  // Connexion automatique si on arrive dans un nouvel onglet
-  const _pending = sessionStorage.getItem('_pendingSession');
-  if(_pending){
-    sessionStorage.removeItem('_pendingSession');
-    try{
-      const {email, password, role} = JSON.parse(_pending);
-      pendingRole = role;
-      const cred = await FB.signInWithEmailAndPassword(FB.auth, email, password);
-      const snap = await FB.getDocs(FB.query(FB.collection(FB.db,'users'), FB.where('email','==',email)));
-      let userDoc = null;
-      if(!snap.empty) userDoc = {id:snap.docs[0].id,...snap.docs[0].data()};
-      if(userDoc){
-        session = {...userDoc, uid:cred.user.uid, id:cred.user.uid, email:userDoc.email||email, mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
-        document.getElementById('home-page').style.display='none';
-        document.getElementById('app').style.display='flex';
-        setupApp();
+  // Connexion automatique si on arrive dans un nouvel onglet via ?_sk=
+  const _urlParams = new URLSearchParams(location.search);
+  const _sk = _urlParams.get('_sk');
+  if(_sk){
+    // Nettoyer l'URL sans recharger la page
+    history.replaceState(null,'',location.pathname);
+    const _raw = localStorage.getItem(_sk);
+    if(_raw){
+      localStorage.removeItem(_sk);
+      try{
+        const {email, password, role} = JSON.parse(_raw);
+        pendingRole = role;
+        const cred = await FB.signInWithEmailAndPassword(FB.auth, email, password);
+        // Charger le profil
+        let userDoc = null;
+        const userRef = FB.doc(FB.db,'users',cred.user.uid);
+        const userSnap = await FB.getDoc(userRef);
+        if(userSnap.exists()) userDoc = {id:userSnap.id,...userSnap.data()};
+        if(!userDoc){
+          const legacySnap = await FB.getDocs(FB.query(FB.collection(FB.db,'users'),FB.where('email','==',email)));
+          if(!legacySnap.empty) userDoc = {id:cred.user.uid,...legacySnap.docs[0].data()};
+        }
+        if(userDoc){
+          session = {...userDoc, uid:cred.user.uid, id:cred.user.uid, email:userDoc.email||email, mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
+          document.getElementById('home-page').style.display='none';
+          document.getElementById('app').style.display='flex';
+          setupApp();
+        }
+      }catch(e){
+        console.error('Auto-login failed',e);
       }
-    }catch(e){
-      console.error('Auto-login failed',e);
     }
   }
 });
@@ -895,15 +907,18 @@ async function doLogin(){
     session={...userDoc, uid: cred.user.uid, id: cred.user.uid, email: userDoc.email||cred.user.email||'', mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
     closeLogin();
 
-    // Stocker la session dans sessionStorage pour le nouvel onglet
-    sessionStorage.setItem('_pendingSession', JSON.stringify({
-      email: document.getElementById('li-email').value.trim().toLowerCase(),
-      password: document.getElementById('li-pass').value,
-      role: pendingRole
-    }));
+    // Stocker les credentials dans sessionStorage AVANT d'ouvrir le nouvel onglet
+    // sessionStorage n'est pas partagé entre onglets — on utilise localStorage avec clé unique
+    const _key = '_hkt_session_'+Date.now();
+    localStorage.setItem(_key, JSON.stringify({email, password:pass, role:pendingRole||userDoc.role, _key}));
 
-    // Ouvrir l'app dans un nouvel onglet
-    window.open(location.href, '_blank');
+    // Ouvrir le nouvel onglet — window.open doit être appelé dans un contexte synchrone
+    // On encode la clé dans l'URL
+    const newUrl = location.href.split('?')[0] + '?_sk=' + encodeURIComponent(_key);
+    window.open(newUrl, '_blank');
+    // Réinitialiser la session locale (on reste sur la page d'accueil)
+    await FB.signOut(FB.auth);
+    session = null;
 
   } catch(e) {
     errEl.textContent = e.code==='auth/invalid-credential' || e.code==='auth/wrong-password'
