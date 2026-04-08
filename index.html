@@ -716,6 +716,28 @@ window.addEventListener('firebase-ready', async () => {
       goHome();
     }
   });
+
+  // Connexion automatique si on arrive dans un nouvel onglet
+  const _pending = sessionStorage.getItem('_pendingSession');
+  if(_pending){
+    sessionStorage.removeItem('_pendingSession');
+    try{
+      const {email, password, role} = JSON.parse(_pending);
+      pendingRole = role;
+      const cred = await FB.signInWithEmailAndPassword(FB.auth, email, password);
+      const snap = await FB.getDocs(FB.query(FB.collection(FB.db,'users'), FB.where('email','==',email)));
+      let userDoc = null;
+      if(!snap.empty) userDoc = {id:snap.docs[0].id,...snap.docs[0].data()};
+      if(userDoc){
+        session = {...userDoc, uid:cred.user.uid, id:cred.user.uid, email:userDoc.email||email, mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
+        document.getElementById('home-page').style.display='none';
+        document.getElementById('app').style.display='flex';
+        setupApp();
+      }
+    }catch(e){
+      console.error('Auto-login failed',e);
+    }
+  }
 });
 
 function hideLoading(){
@@ -872,9 +894,16 @@ async function doLogin(){
 
     session={...userDoc, uid: cred.user.uid, id: cred.user.uid, email: userDoc.email||cred.user.email||'', mrcs:Array.isArray(userDoc.mrcs)?userDoc.mrcs:[]};
     closeLogin();
-    document.getElementById('home-page').style.display='none';
-    document.getElementById('app').style.display='flex';
-    setupApp();
+
+    // Stocker la session dans sessionStorage pour le nouvel onglet
+    sessionStorage.setItem('_pendingSession', JSON.stringify({
+      email: document.getElementById('li-email').value.trim().toLowerCase(),
+      password: document.getElementById('li-pass').value,
+      role: pendingRole
+    }));
+
+    // Ouvrir l'app dans un nouvel onglet
+    window.open(location.href, '_blank');
 
   } catch(e) {
     errEl.textContent = e.code==='auth/invalid-credential' || e.code==='auth/wrong-password'
