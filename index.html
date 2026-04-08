@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Page test développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.1 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -5082,7 +5082,28 @@ async function saveUserForm(){
         body:JSON.stringify({email,password:pass,returnSecureToken:false})
       });
       const data=await resp.json();
-      if(data.error){toast('Erreur création compte: '+data.error.message,'err');setSyncing(false);return}
+
+      if(data.error){
+        if(data.error.message==='EMAIL_EXISTS'){
+          // Compte Auth déjà existant — récupérer l'UID via sign-in silencieux
+          const signInResp=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyDPq8u5bO_8yACQromO5Vzgy5g_E6xrads`,{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({email,password:pass,returnSecureToken:true})
+          });
+          const signInData=await signInResp.json();
+          if(signInData.error){
+            toast('Compte Auth existant mais mot de passe incorrect. Supprimez le compte dans la console Firebase Auth puis réessayez.','err');
+            setSyncing(false);return;
+          }
+          const existingUid=signInData.localId;
+          // Créer/mettre à jour le profil Firestore sous l'UID récupéré
+          await FB.setDoc(FB.doc(FB.db,'users',existingUid),{nom,prenom,compagnie:co,role,ville,email,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,conseiller_attribue:conseillerAttribue,actif:true,updatedAt:FB.serverTimestamp()},{merge:true});
+          toast('Compte existant récupéré et profil mis à jour ✓','warn');
+          userFormMode=null;userFormId=null;
+          setSyncing(false);return;
+        }
+        toast('Erreur création compte: '+data.error.message,'err');setSyncing(false);return;
+      }
       // Save profile in Firestore
       await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,conseiller_attribue:conseillerAttribue,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
       toast('Utilisateur créé avec succès');
