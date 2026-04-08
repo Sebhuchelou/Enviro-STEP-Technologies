@@ -587,6 +587,10 @@ tbody tr:hover{background:#f8fbf5;}
           <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           Espace Conseiller
         </button>
+        <button type="button" class="home-secondary-btn" onclick="openLogin('comptabilite')" style="border-color:#0f766e;color:#0f766e">
+          <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+          Comptabilité
+        </button>
       </div>
 
       <div class="home-footer-bar">
@@ -787,6 +791,7 @@ const ROLE_META={
   distributeur: {title:'Espace Distributeur', sub:'Réservé aux distributeurs autorisés',     color:'#1b5fa8', modal:'border-blue'},
   conseiller:   {title:'Espace Conseiller',   sub:'Lecture des fiches par MRC attribuées',   color:'#7c3aed', modal:''},
   administrateur:{title:'Administration',     sub:'Accès sécurisé — personnel Enviro-STEP',  color:'#1e2530', modal:'border-dark'},
+  comptabilite: {title:'Comptabilité',        sub:'Gestion des installateurs et Hydro-Prime',color:'#0f766e', modal:'border-dark'},
 };
 
 function openLogin(role){
@@ -893,8 +898,8 @@ function goHome(){
 // APP SETUP + REALTIME LISTENERS
 // ════════════════════════════════════════════════════════
 function setupApp(){
-  const ac={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#6d28d9'};
-  const dc={administrateur:'#1e2530',assembleur:'#4caf1a',distributeur:'#1b5fa8',conseiller:'#7c3aed'};
+  const ac={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#6d28d9',comptabilite:'#0f766e'};
+  const dc={administrateur:'#1e2530',assembleur:'#4caf1a',distributeur:'#1b5fa8',conseiller:'#7c3aed',comptabilite:'#14b8a6'};
   const init=(session.prenom||'?')[0]+(session.nom||'?')[0];
   document.getElementById('nav-avatar').textContent=init.toUpperCase();
   document.getElementById('nav-avatar').style.background=ac[session.role]||'#607d8b';
@@ -916,6 +921,10 @@ function setupApp(){
       <button class="nav-link" onclick="switchPanel('avisInstal',this)">
         <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>Avis d'installation
       </button>`;
+  } else if(session.role==='comptabilite'){
+    navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('comptabilite',this)">
+      <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Installateurs &amp; Hydro-Prime
+    </button>`;
   } else {
     const navLabel = session.role==='assembleur' ? 'Mes assemblages' : session.role==='distributeur' ? 'Mes livraisons' : session.role==='conseiller' ? 'Mon tableau de bord' : 'Mon tableau';
     navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('${(session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller')?'dashboard':'tableau'}',this)">
@@ -923,10 +932,12 @@ function setupApp(){
     </button>`;
   }
 
-  currentPanel = (session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller') ? 'dashboard' : 'tableau';
+  currentPanel = (session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller') ? 'dashboard' : session.role==='comptabilite' ? 'comptabilite' : 'tableau';
   startListeners();
   if(session.role==='assembleur'||session.role==='distributeur'||session.role==='conseiller'){
     renderDashboard();
+  } else if(session.role==='comptabilite'){
+    renderComptabilite();
   }
 }
 
@@ -980,7 +991,20 @@ function startListeners(){
       snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
       if(currentPanel==='users') renderUsers();
       if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='comptabilite') renderComptabilite();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
+  }
+  if(session.role==='comptabilite'){
+    unsubUsers = FB.onSnapshot(FB.collection(FB.db,'users'), snap=>{
+      allUsers=[];
+      snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
+      if(currentPanel==='comptabilite') renderComptabilite();
+    }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
+    window._unsubHydroPrime = FB.onSnapshot(FB.collection(FB.db,'HydroPrime'), snap=>{
+      window.allHydroPrime=[];
+      snap.forEach(d=>window.allHydroPrime.push({id:d.id,...d.data()}));
+      if(currentPanel==='comptabilite') renderComptabilite();
+    }, err=>toast('Erreur lecture HydroPrime: '+err.message,'err'));
   }
 }
 
@@ -996,6 +1020,7 @@ function renderPanel(){
   if(currentPanel==='tableau')renderTableau();
   else if(currentPanel==='dashboard')renderDashboard();
   else if(currentPanel==='avisInstal')renderAvisInstal();
+  else if(currentPanel==='comptabilite')renderComptabilite();
   else renderUsers();
 }
 
@@ -1044,6 +1069,105 @@ async function assignHkToAvis(avisId, hk, selectEl){
 let asmView = null;
 let asmLivreFilter = null; // null | 'mois' | 'annee' | '6mois' | 'plus12'
 let asmStockProdFilter = null; // filtre par produit_principal pour la vue stock
+
+// ════════════════════════════════════════════════════════
+// ÉCRAN COMPTABILITÉ
+// ════════════════════════════════════════════════════════
+function renderComptabilite(){
+  const main=document.getElementById('app-main');
+  const allHP=window.allHydroPrime||[];
+  const entreprises=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
+
+  const rows=entreprises.map(u=>{
+    const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
+    return{...u,hp_cumules:hp.hp_cumules||0,hp_utilises:hp.hp_utilises||0,hp_restants:hp.hp_restants||0,_hpId:hp.id||null};
+  });
+
+  const allChecked=rows.length>0&&rows.every(r=>selectedEntreprises.has(r.id));
+
+  const tblRows=rows.length?rows.map(r=>{
+    const isE=editingId===r.id;
+    const hpBadge=(val,color,bg)=>`<span style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:${color};background:${bg};padding:2px 9px;border-radius:4px">${val}</span>`;
+    const eligBadge=r.hp_restants>=10?'🎁':r.hp_restants>=5?'💵':'';
+    return`<tr id="cpt-row-${r.id}">
+      <td style="font-weight:600;color:var(--charcoal)">${esc(r.compagnie||'—')}</td>
+      <td>${isE?`<input id="cpt-tel" value="${esc(r.telephone||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.telephone||'—')}</td>
+      <td>${isE?`<input id="cpt-email" value="${esc(r.email||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.email||'—')}</td>
+      <td style="text-align:center">${hpBadge(r.hp_cumules,'#b45309','#fffbeb')}</td>
+      <td style="text-align:center">
+        ${isE
+          ?`<input type="number" id="cpt-hp-util" value="${r.hp_utilises}" min="0" max="${r.hp_cumules}" style="width:70px;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:.83rem;text-align:center"/>`
+          :hpBadge(r.hp_utilises,'#dc2626','#fef2f2')}
+      </td>
+      <td style="text-align:center">
+        <div style="display:flex;align-items:center;gap:5px;justify-content:center">
+          ${hpBadge(r.hp_restants,r.hp_restants>=5?'var(--green-dark)':'#92400e',r.hp_restants>=5?'#f0fdf4':'#fffbeb')}
+          ${eligBadge?`<span style="font-size:.8rem">${eligBadge}</span>`:''}
+        </div>
+      </td>
+      <td class="td-actions">
+        ${isE
+          ?`<button class="row-btn save-btn" onclick="saveComptabiliteRow('${r.id}','${r._hpId||''}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="editingId=null;editBuf={};renderComptabilite()">✕</button>`
+          :`<button class="row-btn edit-btn" onclick="editingId='${r.id}';editBuf={};renderComptabilite()">✎</button>`}
+      </td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="7"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
+
+  main.innerHTML=`
+    <div class="page-header">
+      <div>
+        <div class="page-title">💰 Installateurs &amp; Hydro-Prime</div>
+        <div class="page-sub">${rows.length} entreprise${rows.length!==1?'s':''} — Lecture seule sauf Téléphone, Courriel et HP Utilisés</div>
+      </div>
+    </div>
+    <div class="tbl-card">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>Compagnie</th>
+            <th>Téléphone</th>
+            <th>Courriel</th>
+            <th style="text-align:center;background:#fffbeb;color:#b45309">HP Cumulés</th>
+            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés ✎</th>
+            <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">HP Restants</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>${tblRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:.74rem;color:var(--slate);display:flex;gap:16px">
+      <span>💵 5 HP min. = crédit (1 HP = 100 $)</span>
+      <span>🎁 10 HP min. = cadeau (~2 000 $)</span>
+    </div>`;
+}
+
+async function saveComptabiliteRow(userId, hpId){
+  setSyncing(true);
+  try{
+    const tel  =document.getElementById('cpt-tel')?.value.trim()||'';
+    const email=document.getElementById('cpt-email')?.value.trim()||'';
+    const hpUtil=parseInt(document.getElementById('cpt-hp-util')?.value||'0')||0;
+
+    // Trouver la compagnie pour màj HydroPrime
+    const u=allUsers.find(x=>x.id===userId);
+    const co=u?u.compagnie||'':'';
+
+    await FB.updateDoc(FB.doc(FB.db,'users',userId),{telephone:tel,email,updatedAt:FB.serverTimestamp()});
+
+    const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===co&&(r.statut||'').startsWith('Livré'));
+    const hpCum=livres.length;
+    const hpRest=hpCum-hpUtil;
+    if(hpId){
+      await FB.updateDoc(FB.doc(FB.db,'HydroPrime',hpId),{hp_utilises:hpUtil,hp_restants:hpRest,updatedAt:FB.serverTimestamp()});
+    } else {
+      await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:co,ville:u?.ville||'',telephone:tel,hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
+    }
+    editingId=null; editBuf={};
+    toast('Mis à jour ✓');
+  }catch(e){toast('Erreur: '+e.message,'err')}
+  setSyncing(false);
+}
 
 function renderDashboard(){
   if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard') { renderTableauFiltered(); return; }
@@ -1264,8 +1388,11 @@ function renderConseillerDashboard(){
   const il12mois   = new Date(now); il12mois.setFullYear(il12mois.getFullYear()-1);
 
   const allAvis  = window.allAvisInstal||[];
-  const allHP    = window.allHydroPrime||[];
   const allU     = allUsers||[];
+  const allHP    = (window.allHydroPrime||[]).filter(h=>{
+    const ent=allU.find(u=>u.role==='entreprise'&&(u.compagnie||'')===(h.nom_entreprise||''));
+    return !ent || (ent.conseiller_attribue||'')===(consNom||'');
+  });
 
   // Avis du conseiller (conseiller_regional === prénom + nom du conseiller)
   const consNom = ((session.prenom||'')+' '+(session.nom||'')).trim();
@@ -1684,7 +1811,16 @@ function openHpPopup(nomEntreprise, type, hpUtilises){
 
 function renderHydroPrimeTable(filtre){
   const allHP=window.allHydroPrime||[];
-  let sorted=[...allHP].sort((a,b)=>(a.nom_entreprise||'').localeCompare(b.nom_entreprise||'','fr'));
+  const consNom=session.role==='conseiller'?((session.prenom||'')+' '+(session.nom||'')).trim():'';
+  // Filtrer par conseiller si rôle conseiller
+  let base=[...allHP];
+  if(consNom){
+    base=base.filter(h=>{
+      const ent=(allUsers||[]).find(u=>u.role==='entreprise'&&(u.compagnie||'')===(h.nom_entreprise||''));
+      return !ent||(ent.conseiller_attribue||'')===(consNom);
+    });
+  }
+  let sorted=base.sort((a,b)=>(a.nom_entreprise||'').localeCompare(b.nom_entreprise||'','fr'));
   if(filtre==='credit')         sorted=sorted.filter(r=>(r.hp_restants||0)>=5);
   if(filtre==='cadeau')         sorted=sorted.filter(r=>(r.hp_restants||0)>=10);
   if(filtre==='proche_credit')  sorted=sorted.filter(r=>(r.hp_restants||0)===4);
@@ -3692,6 +3828,7 @@ const USER_COLS=[
   {k:'assembleur_defaut',   l:'Assembleur par défaut',  distOnly:true},
   {k:'assembleur_2',        l:'2ième Assembleur',       distOnly:true},
   {k:'assembleur_3',        l:'3ième Assembleur',       distOnly:true},
+  {k:'conseiller_attribue', l:'Conseiller attribué',    entOnly:true},
   {k:'mot_de_passe',        l:'Mot de passe (nouveau seulement)', exportSkip:true},
 ];
 
@@ -3844,15 +3981,15 @@ const UI_MAP = {
   'rôle':'role','role':'role',
   'entreprise':'entreprise','entreprises':'entreprise','entreprise (sans accès)':'entreprise',
   'mrc(s)':'mrcs','mrcs':'mrcs','mrc':'mrcs',
+  'conseiller attribué':'conseiller_attribue','conseiller attribue':'conseiller_attribue',
   'assembleur par défaut':'assembleur_defaut','assembleur par defaut':'assembleur_defaut',
   '2ième assembleur':'assembleur_2','2ieme assembleur':'assembleur_2','2e assembleur':'assembleur_2',
   '3ième assembleur':'assembleur_3','3ieme assembleur':'assembleur_3','3e assembleur':'assembleur_3',
   'hp utilisés':'hp_utilises','hp utilises':'hp_utilises','hydro-prime utilisés':'hp_utilises',
-  'téléphone':'telephone','telephone':'telephone',
   'mot de passe (nouveau seulement)':'password',
   'mot de passe':'password','password':'password','mdp':'password',
 };
-const UI_VALID_ROLES = ['assembleur','distributeur','conseiller','administrateur','entreprise'];
+const UI_VALID_ROLES = ['assembleur','distributeur','conseiller','administrateur','entreprise','comptabilite'];
 
 function uiBuildPreview(headers, rows){
   const colMap = headers.map(h => UI_MAP[h.toLowerCase().trim()] || null);
@@ -4338,6 +4475,10 @@ function renderEntreprisesTable(){
       <td>${isE?`<input id="ent-ville" value="${esc(r.ville||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.ville||'—')}</td>
       <td>${isE?`<input id="ent-tel" value="${esc(r.telephone||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.telephone||'—')}</td>
       <td>${isE?`<input id="ent-email" value="${esc(r.email||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.email||'—')}</td>
+      <td>${isE?`<select id="ent-cons" style="width:100%;padding:5px 8px;border:1px solid #e9d5ff;border-radius:3px;font-size:.83rem;background:#fdf4ff"><option value="">— Non attribué —</option>${(allUsers||[]).filter(x=>x.role==='conseiller'&&x.actif!==false).map(x=>{const n=((x.prenom||'')+' '+(x.nom||'')).trim();return`<option value="${esc(n)}"${n===(r.conseiller_attribue||'')?'selected':''}>${esc(n)}</option>`}).join('')}</select>`:esc(r.conseiller_attribue||'—')}</td>
+      <td>${isE?`<select id="ent-conseiller" style="width:100%;padding:5px 8px;border:1px solid #e9d5ff;border-radius:3px;font-size:.83rem;background:#fdf4ff">${
+        '<option value="">— Non attribué —</option>'+(allUsers||[]).filter(u=>(u.role==='conseiller')&&u.actif!==false).map(u=>{const n=((u.prenom||'')+' '+(u.nom||'')).trim();return`<option value="${esc(n)}"${n===(r.conseiller_attribue||'')?'  selected':''}>${esc(n)}</option>`;}).join('')
+      }</select>`:(`<span style="font-size:.78rem;color:#7c3aed">${esc(r.conseiller_attribue||'—')}</span>`)}</td>
       <td style="text-align:center">
         <span onclick="openHpPopup('${esc(r.compagnie||'').replace(/'/g,"\\'")}','cumules')" style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:#b45309;background:#fffbeb;padding:2px 9px;border-radius:4px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fffbeb'">${r.hp_cumules}</span>
       </td>
@@ -4355,7 +4496,7 @@ function renderEntreprisesTable(){
           :`<button class="row-btn edit-btn" onclick="startEditEnt('${r.id}')">✎</button><button class="row-btn del-btn" onclick="deleteEntreprise('${r.id}')">🗑</button>`}
       </td>
     </tr>`;
-  }).join(''):`<tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
+  }).join(''):`<tr><td colspan="10"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
 
   main.innerHTML=`
     <div class="page-header">
@@ -4380,7 +4521,7 @@ function renderEntreprisesTable(){
         <table>
           <thead><tr>
             <th style="width:36px"><input type="checkbox" ${allChecked?'checked':''} onchange="toggleAllEnt(this.checked)" style="cursor:pointer;width:15px;height:15px"/></th>
-            <th>Compagnie</th><th>Ville</th><th>Téléphone</th><th>Courriel</th>
+            <th>Compagnie</th><th>Ville</th><th>Téléphone</th><th>Courriel</th><th>Conseiller</th><th>Conseiller</th>
             <th style="text-align:center;background:#fffbeb;color:#b45309">Hydro-Primes cumulés</th>
             <th style="text-align:center;background:#fef2f2;color:#dc2626">Hydro-Primes utilisés ✎</th>
             <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">Hydro-Primes restants</th>
@@ -4417,7 +4558,8 @@ async function saveEntreprise(userId,hpId){
     const tel  =document.getElementById('ent-tel')?.value.trim()||'';
     const email=document.getElementById('ent-email')?.value.trim()||'';
     const hpUtil=parseInt(document.getElementById('ent-hp-utilises')?.value||'0')||0;
-    await FB.updateDoc(FB.doc(FB.db,'users',userId),{compagnie:co,ville,telephone:tel,email,updatedAt:FB.serverTimestamp()});
+    const consAttrib=document.getElementById('ent-cons')?.value||'';
+    await FB.updateDoc(FB.doc(FB.db,'users',userId),{compagnie:co,ville,telephone:tel,email,conseiller_attribue:consAttrib,updatedAt:FB.serverTimestamp()});
     const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===co&&(r.statut||'').startsWith('Livré'));
     const hpCum=livres.length;
     const hpRest=hpCum-hpUtil;
@@ -4457,14 +4599,14 @@ function exportEntreprisesXLSX(){
   loadXLSX(()=>{
     const allHP=window.allHydroPrime||[];
     const rows=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
-    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes cumulés','Hydro-Primes utilisés','Hydro-Primes restants'];
+    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes cumulés','Hydro-Primes utilisés','Hydro-Primes restants','Conseiller attribué'];
     const data=rows.map(u=>{
       const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
-      return[u.compagnie||'',u.ville||'',u.telephone||'',u.email||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0];
+      return[u.compagnie||'',u.ville||'',u.telephone||'',u.email||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0,u.conseiller_attribue||''];
     });
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:14},{wch:14}];
+    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:14},{wch:14},{wch:24}];
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
     XLSX.utils.book_append_sheet(wb,ws,'Entreprises Hydro-Prime');
@@ -4475,11 +4617,11 @@ function exportEntreprisesXLSX(){
 
 function downloadEntreprisesGabarit(){
   loadXLSX(()=>{
-    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes utilisés'];
-    const example=[['Excavation Martin inc.','Lévis','418-555-0101','martin@excavation.ca','0'],['Béton Lavoie','Québec','418-555-0202','lavoie@beton.ca','5']];
+    const headers=['Compagnie','Ville','Téléphone','Courriel','Hydro-Primes utilisés','Conseiller attribué'];
+    const example=[['Excavation Martin inc.','Lévis','418-555-0101','martin@excavation.ca','0','Jean Tremblay'],['Béton Lavoie','Québec','418-555-0202','lavoie@beton.ca','5','Marie Gagnon']];
     const wb=XLSX.utils.book_new();
     const ws=XLSX.utils.aoa_to_sheet([headers,...example]);
-    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14}];
+    ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:30},{wch:14},{wch:24}];
     const range=XLSX.utils.decode_range(ws['!ref']);
     for(let C=range.s.c;C<=range.e.c;C++){const addr=XLSX.utils.encode_cell({r:0,c:C});if(!ws[addr])continue;ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'b45309'}},alignment:{horizontal:'center'}};}
     const wsNote=XLSX.utils.aoa_to_sheet([
@@ -4516,6 +4658,10 @@ function renderUserForm(){
   const asmCompagnies=[...new Set((allUsers||[]).filter(x=>x.role==='assembleur'&&x.actif!==false&&x.compagnie).map(x=>x.compagnie))].sort();
   const asmOpts=(selected='')=>'<option value="">— Aucun —</option>'+asmCompagnies.map(c=>`<option value="${esc(c)}"${c===selected?' selected':''}>${esc(c)}</option>`).join('');
 
+  // Liste des conseillers
+  const conseillers=[...new Set((allUsers||[]).filter(x=>(x.role==='conseiller')&&x.actif!==false).map(x=>((x.prenom||'')+' '+(x.nom||'')).trim()).filter(Boolean))].sort();
+  const consOpts=(selected='')=>'<option value="">— Non attribué —</option>'+conseillers.map(c=>`<option value="${esc(c)}"${c===selected?' selected':''}>${esc(c)}</option>`).join('');
+
   area.innerHTML=`
     <div class="form-card">
       <div class="page-title" style="margin-bottom:4px;font-size:1.2rem">${userFormMode==='add'?'Nouvel utilisateur':'Modifier l\'utilisateur'}</div>
@@ -4532,6 +4678,7 @@ function renderUserForm(){
             <option value="distributeur"${currentRole==='distributeur'?' selected':''}>Distributeur</option>
             <option value="conseiller"${currentRole==='conseiller'?' selected':''}>Conseiller</option>
             <option value="administrateur"${currentRole==='administrateur'?' selected':''}>Administrateur</option>
+            <option value="comptabilite"${currentRole==='comptabilite'?' selected':''}>Comptabilité</option>
             <option value="entreprise"${currentRole==='entreprise'?' selected':''}>Entreprise (sans accès)</option>
           </select>
         </div>
@@ -4558,6 +4705,14 @@ function renderUserForm(){
           </div>
         </div>
 
+        <!-- Champ conseiller attribué — visible uniquement si rôle = entreprise -->
+        <div id="uf-ent-fields" class="form-group" style="display:${currentRole==='entreprise'?'block':'none'}">
+          <label>Conseiller attribué</label>
+          <select id="uf-conseiller-attribue" style="width:100%;padding:7px 10px;border:1px solid #e9d5ff;border-radius:var(--r);font-size:.83rem;margin-top:4px;background:#fdf4ff">
+            ${consOpts(u?u.conseiller_attribue||'':'')}
+          </select>
+        </div>
+
         ${userFormMode==='edit'?`<div class="form-group"><label>Statut du compte</label><select id="uf-actif"><option value="true"${u&&u.actif!==false?' selected':''}>Actif</option><option value="false"${u&&u.actif===false?' selected':''}>Inactif</option></select></div>`:''}
         ${userFormMode==='add'?`<div class="form-group full"><label>Mot de passe * (min. 6 caractères)</label><input type="password" id="uf-pass" placeholder="••••••••"/></div>`
         :`<div class="form-group full"><label>Nouveau mot de passe (laisser vide = inchangé)</label><input type="password" id="uf-pass" placeholder="••••••••"/><small style="color:var(--slate);font-size:.74rem;margin-top:4px">Le changement de mot de passe se fait via la console Firebase Authentication</small></div>`}
@@ -4570,8 +4725,10 @@ function renderUserForm(){
 }
 
 function ufToggleDistFields(role){
-  const el=document.getElementById('uf-dist-fields');
-  if(el) el.style.display=role==='distributeur'?'block':'none';
+  const distEl=document.getElementById('uf-dist-fields');
+  const entEl=document.getElementById('uf-ent-fields');
+  if(distEl) distEl.style.display=role==='distributeur'?'block':'none';
+  if(entEl)  entEl.style.display=role==='entreprise'?'block':'none';
 }
 
 async function saveUserForm(){
@@ -4586,6 +4743,7 @@ async function saveUserForm(){
   const asmDefaut=(document.getElementById('uf-asm-defaut')?.value||'');
   const asm2=(document.getElementById('uf-asm-2')?.value||'');
   const asm3=(document.getElementById('uf-asm-3')?.value||'');
+  const conseillerAttribue=(document.getElementById('uf-conseiller-attribue')?.value||'');
   if(!prenom||!nom||!co||!role){toast('Champs obligatoires manquants','err');return}
   setSyncing(true);
   try{
@@ -4601,13 +4759,13 @@ async function saveUserForm(){
       const data=await resp.json();
       if(data.error){toast('Erreur création compte: '+data.error.message,'err');setSyncing(false);return}
       // Save profile in Firestore
-      await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
+      await FB.setDoc(FB.doc(FB.db,'users',data.localId),{nom,prenom,compagnie:co,role,ville,email,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,conseiller_attribue:conseillerAttribue,actif:true,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()},{merge:true});
       toast('Utilisateur créé avec succès');
     } else {
       // Update Firestore profile only
       const actifEl=document.getElementById('uf-actif');
       const actif=actifEl?actifEl.value==='true':true;
-      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,actif,updatedAt:FB.serverTimestamp()});
+      await FB.updateDoc(FB.doc(FB.db,'users',userFormId),{nom,prenom,compagnie:co,role,ville,mrcs,assembleur_defaut:asmDefaut,assembleur_2:asm2,assembleur_3:asm3,conseiller_attribue:conseillerAttribue,actif,updatedAt:FB.serverTimestamp()});
       toast('Profil mis à jour');
     }
     userFormMode=null;userFormId=null;
