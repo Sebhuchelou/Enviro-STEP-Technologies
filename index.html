@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.18 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.19 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -703,7 +703,7 @@ tbody tr:hover{background:#f8fbf5;}
 // ════════════════════════════════════════════════════════
 // JOURNAL PLATEFORME
 // ════════════════════════════════════════════════════════
-async function logJournal(section, action, avant, apres){
+async function logJournal(section, action, avant, apres, conseiller_ref){
   try{
     if(!session) return;
     await FB.addDoc(FB.collection(FB.db,'PlatformJournal'),{
@@ -714,6 +714,7 @@ async function logJournal(section, action, avant, apres){
       action: action,
       avant: avant||'',
       apres: apres||'',
+      conseiller_ref: conseiller_ref||'',
       createdAt: FB.serverTimestamp()
     });
   }catch(e){ console.warn('logJournal error:',e.message); }
@@ -2830,22 +2831,10 @@ async function loadConsJournalAvis(consNom){
     const all=[];
     snap.forEach(d=>all.push({id:d.id,...d.data()}));
 
-    // Filtrer : section = Avis d'installation
-    const avisEntries=all
-      .filter(e=>(e.section||'')==="Avis d'installation")
+    // Filtrer : section = Avis d'installation ET conseiller_ref = consNom
+    const entries=all
+      .filter(e=>(e.section||'')==="Avis d'installation" && (e.conseiller_ref||'')===(consNom||''))
       .sort((a,b)=>(b.date_heure?.seconds||0)-(a.date_heure?.seconds||0));
-
-    // Croiser avec les avis du conseiller pour ne garder que ceux qui lui appartiennent
-    const mesAvisIds=new Set((window.allAvisInstal||[])
-      .filter(a=>(a.conseiller_regional||'')===(consNom||''))
-      .map(a=>a.id));
-
-    // Pour les entrées du journal, extraire l'id de l'avis depuis le champ avant/apres
-    const entries=avisEntries.filter(e=>{
-      // Le champ avant contient "Avis [id] — ..."
-      const m=(e.avant||'').match(/^Avis\s+(\S+)\s+—/);
-      return m && mesAvisIds.has(m[1]);
-    });
 
     if(countEl) countEl.textContent=entries.length||'0';
 
@@ -5189,10 +5178,12 @@ async function saveAvisField(id, key, value){
     }
     const avisRec=(window.allAvisInstal||[]).find(a=>a.id===id);
     const avant=String(avisRec?.[key]??'');
+    const conseillerAvis=avisRec?.conseiller_regional||'';
     await FB.updateDoc(FB.doc(FB.db,'AvisInstal',id), updateData);
     await logJournal("Avis d'installation",'Modification',
       `Avis ${id} — ${key}: "${avant}"`,
-      `"${String(value)}"`
+      `"${String(value)}"`,
+      conseillerAvis
     );
     toast(key==='assembleur_attribue'?'Assembleur attribué ✓':'Mis à jour ✓');
   }catch(e){toast('Erreur: '+e.message,'err')}
