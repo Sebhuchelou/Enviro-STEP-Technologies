@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.10 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.11 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -2152,7 +2152,7 @@ function renderDashboard(){
     return entries.map(([prod,cnt])=>{
       const clickAttr=clickProduit?`onclick="asmView='stock';asmStockProdFilter='${prod.replace(/'/g,"\\'").replace(/"/g,'&quot;')}';renderDashboard()" style="cursor:pointer"`:'';
       const hoverStyle=clickProduit?` onmouseover="this.style.background='${color}18'" onmouseout="this.style.background=''"`:''
-      return`<div ${clickAttr}${hoverStyle} style="margin-bottom:10px;padding:4px 6px;border-radius:4px;transition:background .15s">
+      return`<div ${clickAttr}${hoverStyle} style="margin-bottom:13px;padding:4px 6px;border-radius:4px;transition:background .15s">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
           <span style="font-size:.78rem;color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${esc(prod)}">${esc(prod)}</span>
           <span style="font-family:var(--cond);font-size:.85rem;font-weight:700;color:${color};margin-left:8px">${cnt}</span>
