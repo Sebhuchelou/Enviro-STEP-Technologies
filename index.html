@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.5 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.6 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1158,53 +1158,51 @@ function renderComptabilite(){
     return{...u,hp_cumules:hp.hp_cumules||0,hp_utilises:hp.hp_utilises||0,hp_restants:hp.hp_restants||0,_hpId:hp.id||null};
   });
 
-  const allChecked=rows.length>0&&rows.every(r=>selectedEntreprises.has(r.id));
+  const hpBadge=(val,color,bg)=>`<span style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:${color};background:${bg};padding:2px 9px;border-radius:4px">${val}</span>`;
 
-  const tblRows=rows.length?rows.map(r=>{
+  function buildRow(r){
     const isE=editingId===r.id;
-    const hpBadge=(val,color,bg)=>`<span style="font-family:var(--cond);font-size:.88rem;font-weight:800;color:${color};background:${bg};padding:2px 9px;border-radius:4px">${val}</span>`;
     const eligBadge=r.hp_restants>=10?'🎁':r.hp_restants>=5?'💵':'';
-    return`<tr id="cpt-row-${r.id}">
+    const co=esc(r.compagnie||'').replace(/'/g,"&apos;");
+    const hpId=r._hpId||'';
+    let restCell=`<div style="display:flex;align-items:center;gap:6px;justify-content:center">
+        ${hpBadge(r.hp_restants,r.hp_restants>=5?'var(--green-dark)':'#92400e',r.hp_restants>=5?'#f0fdf4':'#fffbeb')}
+        ${eligBadge?`<span style="font-size:.8rem">${eligBadge}</span>`:''}
+        ${r.hp_restants>0?`<button onclick="openUtiliserHpModal('${r.id}','${hpId}','${co}',${r.hp_restants})" style="padding:2px 8px;border-radius:3px;border:1px solid var(--green);background:#f0fdf4;color:var(--green-dark);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">− Utiliser</button>`:''}
+      </div>`;
+    let actions=isE
+      ?`<button class="row-btn save-btn" onclick="saveComptabiliteRow('${r.id}','${hpId}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="editingId=null;editBuf={};renderComptabilite()">✕</button>`
+      :`<button class="row-btn edit-btn" onclick="editingId='${r.id}';editBuf={};renderComptabilite()">✎</button>`;
+    return `<tr id="cpt-row-${r.id}">
       <td style="font-weight:600;color:var(--charcoal)">${esc(r.compagnie||'—')}</td>
       <td>${isE?`<input id="cpt-tel" value="${esc(r.telephone||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.telephone||'—')}</td>
       <td>${isE?`<input id="cpt-email" value="${esc(r.email||'')}" style="width:100%;padding:5px 8px;border:1px solid var(--blue);border-radius:3px;font-size:.83rem"/>`:esc(r.email||'—')}</td>
       <td style="text-align:center">${hpBadge(r.hp_cumules,'#b45309','#fffbeb')}</td>
-      <td style="text-align:center">
-        ${isE
-          ?`<input type="number" id="cpt-hp-util" value="${r.hp_utilises}" min="0" max="${r.hp_cumules}" style="width:70px;padding:5px 8px;border:1px solid #f59e0b;border-radius:3px;font-size:.83rem;text-align:center"/>`
-          :hpBadge(r.hp_utilises,'#dc2626','#fef2f2')}
-      </td>
-      <td style="text-align:center">
-        <div style="display:flex;align-items:center;gap:5px;justify-content:center">
-          ${hpBadge(r.hp_restants,r.hp_restants>=5?'var(--green-dark)':'#92400e',r.hp_restants>=5?'#f0fdf4':'#fffbeb')}
-          ${eligBadge?`<span style="font-size:.8rem">${eligBadge}</span>`:''}
-        </div>
-      </td>
-      <td class="td-actions">
-        ${isE
-          ?`<button class="row-btn save-btn" onclick="saveComptabiliteRow('${r.id}','${r._hpId||''}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="editingId=null;editBuf={};renderComptabilite()">✕</button>`
-          :`<button class="row-btn edit-btn" onclick="editingId='${r.id}';editBuf={};renderComptabilite()">✎</button>`}
-      </td>
+      <td style="text-align:center">${hpBadge(r.hp_utilises,'#dc2626','#fef2f2')}</td>
+      <td style="text-align:center">${restCell}</td>
+      <td style="text-align:center"><button onclick="openJournalHpModal('${hpId}','${co}')" style="padding:2px 8px;border-radius:3px;border:1px solid var(--blue);background:var(--blue-pale);color:var(--blue);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer">📋 Journal</button></td>
+      <td class="td-actions">${actions}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="7"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucune entreprise</p></div></td></tr>`;
+  }
+
+  const tblRows=rows.length?rows.map(buildRow).join(''):`<tr><td colspan="8"><div class="empty-state"><p>Aucune entreprise</p></div></td></tr>`;
 
   main.innerHTML=`
     <div class="page-header">
       <div>
         <div class="page-title">💰 Installateurs &amp; Hydro-Prime</div>
-        <div class="page-sub">${rows.length} entreprise${rows.length!==1?'s':''} — Lecture seule sauf Téléphone, Courriel et HP Utilisés</div>
+        <div class="page-sub">${rows.length} entreprise${rows.length!==1?'s':''} — Téléphone, Courriel éditables</div>
       </div>
     </div>
     <div class="tbl-card">
       <div class="tbl-scroll">
         <table>
           <thead><tr>
-            <th>Compagnie</th>
-            <th>Téléphone</th>
-            <th>Courriel</th>
+            <th>Compagnie</th><th>Téléphone</th><th>Courriel</th>
             <th style="text-align:center;background:#fffbeb;color:#b45309">HP Cumulés</th>
-            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés ✎</th>
+            <th style="text-align:center;background:#fef2f2;color:#dc2626">HP Utilisés</th>
             <th style="text-align:center;background:#f0fdf4;color:var(--green-dark)">HP Restants</th>
+            <th style="text-align:center">Journal</th>
             <th>Actions</th>
           </tr></thead>
           <tbody>${tblRows}</tbody>
@@ -1222,27 +1220,158 @@ async function saveComptabiliteRow(userId, hpId){
   try{
     const tel  =document.getElementById('cpt-tel')?.value.trim()||'';
     const email=document.getElementById('cpt-email')?.value.trim()||'';
-    const hpUtil=parseInt(document.getElementById('cpt-hp-util')?.value||'0')||0;
-
-    // Trouver la compagnie pour màj HydroPrime
-    const u=allUsers.find(x=>x.id===userId);
-    const co=u?u.compagnie||'':'';
-
     await FB.updateDoc(FB.doc(FB.db,'users',userId),{telephone:tel,email,updatedAt:FB.serverTimestamp()});
-
-    const livres=allRecords.filter(r=>(r.nom_entrepreneur||'')===co&&(r.statut||'').startsWith('Livré'));
-    const hpCum=livres.length;
-    const hpRest=hpCum-hpUtil;
-    if(hpId){
-      await FB.updateDoc(FB.doc(FB.db,'HydroPrime',hpId),{hp_utilises:hpUtil,hp_restants:hpRest,updatedAt:FB.serverTimestamp()});
-    } else {
-      await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:co,ville:u?.ville||'',telephone:tel,hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
-    }
     editingId=null; editBuf={};
     toast('Mis à jour ✓');
-  }catch(e){toast('Erreur: '+e.message,'err')}
+  }catch(e){toast('Erreur: '+e.message,'err');}
   setSyncing(false);
 }
+
+// ════════════════════════════════════════════════════════
+// MODAL UTILISER HP
+// ════════════════════════════════════════════════════════
+function openUtiliserHpModal(userId, hpId, compagnie, hpRestants){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  const u=allUsers.find(x=>x.id===userId);
+  const allHP=window.allHydroPrime||[];
+  const hp=allHP.find(h=>(h.nom_entreprise||'')===(u?.compagnie||''))||{};
+  const utilActuel=hp.hp_utilises||0;
+
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:460px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--green)">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">💵 Utiliser des Hydro-Primes</div>
+        <div style="font-size:.75rem;color:var(--slate);margin-top:2px">${esc(compagnie)} — ${hpRestants} HP restants</div>
+      </div>
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Nombre de HP à utiliser * (minimum 5)</label>
+        <input type="number" id="hp-util-qte" min="5" max="${hpRestants}" value="5" oninput="hpUtilPreview(${utilActuel},${hpRestants})" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.9rem;text-align:center;font-family:var(--cond);font-weight:700"/>
+      </div>
+      <div>
+        <label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Numéro de facture *</label>
+        <input type="text" id="hp-util-facture" placeholder="Ex: FAC-2026-001" style="width:100%;padding:8px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem"/>
+      </div>
+      <div style="padding:10px 14px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">
+        <div style="font-size:.72rem;color:var(--steel);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Résumé après utilisation</div>
+        <div style="display:flex;gap:24px">
+          <div><div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:#dc2626" id="hp-preview-util">${utilActuel+5}</div><div style="font-size:.65rem;color:var(--slate)">HP utilisés total</div></div>
+          <div><div style="font-family:var(--cond);font-size:1.1rem;font-weight:800;color:var(--green-dark)" id="hp-preview-rest">${hpRestants-5}</div><div style="font-size:.65rem;color:var(--slate)">HP restants</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+      <button onclick="confirmUtiliserHp('${userId}','${hpId}','${esc(compagnie).replace(/'/g,'&#39;')}',${hpRestants})" style="padding:8px 20px;border-radius:var(--r);border:2px solid var(--green);background:var(--green);color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">✓ Confirmer l'utilisation</button>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+
+function hpUtilPreview(utilActuel, hpRestants){
+  const q=parseInt(document.getElementById('hp-util-qte')?.value)||0;
+  const el1=document.getElementById('hp-preview-util');
+  const el2=document.getElementById('hp-preview-rest');
+  if(el1)el1.textContent=utilActuel+q;
+  if(el2)el2.textContent=Math.max(0,hpRestants-q);
+}
+
+async function confirmUtiliserHp(userId, hpId, compagnie, hpRestants){
+  const qte=parseInt(document.getElementById('hp-util-qte')?.value||'0')||0;
+  const facture=(document.getElementById('hp-util-facture')?.value||'').trim();
+  if(qte<5){toast('Minimum 5 HP par utilisation','err');return;}
+  if(qte>hpRestants){toast('Quantité dépasse les HP restants','err');return;}
+  if(!facture){toast('Numéro de facture requis','err');return;}
+  setSyncing(true);
+  try{
+    const u=allUsers.find(x=>x.id===userId);
+    const co=u?u.compagnie||'':'';
+    const allHP=window.allHydroPrime||[];
+    const hp=allHP.find(h=>(h.nom_entreprise||'')===(co))||{};
+    const utilActuel=hp.hp_utilises||0;
+    const cumules=hp.hp_cumules||0;
+    const newUtil=utilActuel+qte;
+    const newRest=cumules-newUtil;
+    let finalHpId=hpId;
+    if(hpId){
+      await FB.updateDoc(FB.doc(FB.db,'HydroPrime',hpId),{hp_utilises:newUtil,hp_restants:newRest,updatedAt:FB.serverTimestamp()});
+    } else {
+      const ref=await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:co,hp_cumules:cumules,hp_utilises:newUtil,hp_restants:newRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
+      finalHpId=ref.id;
+    }
+    await FB.addDoc(FB.collection(FB.db,'HydroPrimeJournal'),{
+      hp_id:finalHpId, nom_entreprise:co, qte_utilisee:qte,
+      no_facture:facture, hp_restants_apres:newRest,
+      utilisateur:session.email||session.nom||'',
+      date_creation:FB.serverTimestamp()
+    });
+    document.getElementById('attr-overlay').style.display='none';
+    toast(qte+' HP utilisés — Facture '+facture+' ✓');
+  }catch(e){toast('Erreur: '+e.message,'err');}
+  setSyncing(false);
+}
+
+// ════════════════════════════════════════════════════════
+// MODAL JOURNAL HP
+// ════════════════════════════════════════════════════════
+async function openJournalHpModal(hpId, compagnie){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:620px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--blue)">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">📋 Journal HP — ${esc(compagnie)}</div>
+      <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Historique des utilisations Hydro-Prime</div></div>
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+    </div>
+    <div id="journal-hp-body" style="overflow-y:auto;flex:1;padding:16px">
+      <div style="text-align:center;padding:20px;color:var(--slate);font-size:.82rem">Chargement…</div>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+  try{
+    const snap=await FB.getDocs(FB.query(
+      FB.collection(FB.db,'HydroPrimeJournal'),
+      FB.where('nom_entreprise','==',compagnie),
+      FB.orderBy('date_creation','desc')
+    ));
+    const entries=[];
+    snap.forEach(d=>entries.push({id:d.id,...d.data()}));
+    const body=document.getElementById('journal-hp-body');
+    if(!body)return;
+    if(!entries.length){
+      body.innerHTML='<div style="text-align:center;padding:30px;color:var(--slate);font-size:.82rem">Aucune utilisation enregistrée</div>';
+      return;
+    }
+    const rowsHtml=entries.map((e,i)=>{
+      const dateStr=e.date_creation?new Date(e.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      const bg=i%2?'#f7f9fb':'#fff';
+      return `<tr style="background:${bg}">
+        <td style="padding:7px 12px;font-size:.78rem;white-space:nowrap">${dateStr}</td>
+        <td style="padding:7px 12px;text-align:center;font-family:var(--cond);font-weight:800;color:#dc2626">${e.qte_utilisee||0}</td>
+        <td style="padding:7px 12px;font-size:.78rem;font-weight:600">${esc(e.no_facture||'—')}</td>
+        <td style="padding:7px 12px;font-size:.78rem;color:var(--slate)">${esc(e.utilisateur||'—')}</td>
+        <td style="padding:7px 12px;text-align:center;font-family:var(--cond);font-weight:700;color:var(--green-dark)">${e.hp_restants_apres!=null?e.hp_restants_apres:'—'}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML=`<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--blue)">
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">Date</th>
+        <th style="padding:8px 12px;text-align:center;font-size:.72rem;color:#fff">HP utilisés</th>
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">N° Facture</th>
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">Utilisateur</th>
+        <th style="padding:8px 12px;text-align:center;font-size:.72rem;color:#fff">HP restants après</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+  }catch(err){
+    const body=document.getElementById('journal-hp-body');
+    if(body)body.innerHTML=`<div style="padding:20px;color:var(--err)">Erreur: ${esc(err.message)}</div>`;
+  }
+}
+
 
 // ════════════════════════════════════════════════════════
 // ACCUEIL ADMIN
@@ -1839,7 +1968,7 @@ function renderDashboard(){
   function byProduit(list){
     const map={};
     list.forEach(r=>{const p=r.produit_principal||'Non défini';map[p]=(map[p]||0)+1;});
-    return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    return Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0],'fr'));
   }
   function byAssembleur(list){
     const map={};
@@ -2055,6 +2184,12 @@ function renderDashboard(){
 // ════════════════════════════════════════════════════════
 let consInactifFilter = 'plus1'; // plus1 | plus3 | plus6 | plus12
 
+function goConsDashboard(){
+  currentPanel='dashboard';
+  asmView=null;
+  renderConseillerDashboard();
+}
+
 function renderConseillerDashboard(){
   const now = new Date(); now.setHours(0,0,0,0);
   const y=now.getFullYear(), m=now.getMonth();
@@ -2088,18 +2223,18 @@ function renderConseillerDashboard(){
     return !statutLivre.has(rec.statut||'');
   });
 
-  // Nouvelles entreprises ce mois — UNIQUEMENT celles qui ne sont pas encore dans allUsers (role=entreprise)
+  // Nouvelles entreprises — toutes celles dans les avis qui ne sont PAS dans allUsers (role=entreprise)
   const entreprisesUsers = new Set((allU||[]).filter(u=>u.role==='entreprise'&&u.actif!==false).map(u=>(u.compagnie||'').toLowerCase().trim()));
   const entreprisesVues = new Set();
   const entreprisesMois = [];
-  [...myAvis].sort((a,b)=>{const da=avisDate(a)||new Date(0),db=avisDate(b)||new Date(0);return da-db;})
+  [...myAvis].sort((a,b)=>{const da=avisDate(a)||new Date(0),db=avisDate(b)||new Date(0);return db-da;})
     .forEach(r=>{
       const e=r.nom_entreprise_install||r.nom_entrepreneur||'';
       if(!e) return;
       const d=avisDate(r);
       const eKey=e.toLowerCase().trim();
-      // Inclure seulement si : ce mois, première apparition, ET pas encore dans users
-      if(d&&d>=startMois&&!entreprisesVues.has(eKey)&&!entreprisesUsers.has(eKey)){
+      // Inclure si : première apparition ET pas encore dans users (role=entreprise)
+      if(!entreprisesVues.has(eKey)&&!entreprisesUsers.has(eKey)){
         entreprisesMois.push({nom:e, date:d, avis:r});
       }
       entreprisesVues.add(eKey);
@@ -2213,7 +2348,7 @@ function renderConseillerDashboard(){
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
           <div>
             <div style="font-family:var(--cond);font-size:.95rem;font-weight:700;color:var(--charcoal)">🆕 Nouvelles entreprises</div>
-            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Premier avis ce mois — pas encore dans le système</div>
+            <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Entreprises avec avis — non encore dans le système</div>
           </div>
           <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#7c3aed">${entreprisesMois.length}</div>
         </div>
@@ -2225,7 +2360,7 @@ function renderConseillerDashboard(){
               <span style="font-size:.7rem;color:var(--slate);margin-right:4px">${e.date.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'})}</span>
               <button onclick="openCreateEntrepriseModal('${e.nom.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${esc(e.avis?.ville_site||'').replace(/'/g,"\\'")}')" style="padding:3px 9px;border-radius:3px;border:1px solid #7c3aed;background:#f5f3ff;color:#7c3aed;font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">+ Créer</button>
             </div>`).join('')
-          :'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Aucune nouvelle entreprise ce mois</div>'}
+          :'<div style="font-size:.78rem;color:var(--slate);padding:6px 0">Toutes les entreprises sont déjà enregistrées</div>'}
         </div>
       </div>
 
@@ -2549,7 +2684,7 @@ function renderHydroPrimeTable(filtre){
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <button onclick="goConsDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
         </button>
         <div>
@@ -3666,7 +3801,7 @@ function renderTableau(){
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px">
-        ${isCons?`<button onclick="asmView=null;currentPanel='dashboard';renderConseillerDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Tableau de bord</button>`:''}
+        ${isCons?`<button onclick="goConsDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Tableau de bord</button>`:''}
         <div>
           <div class="page-title">${isAdmin?'Tableau de suivi global':session.role==='assembleur'?'Mes assemblages':session.role==='conseiller'?'Tableau de suivi — Mes dossiers':'Mes livraisons'}</div>
           <div class="page-sub">Données Firebase en temps réel — ${rows.length} enregistrement${rows.length!==1?'s':''}</div>
