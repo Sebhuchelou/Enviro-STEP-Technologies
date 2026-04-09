@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.8 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.9 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1054,6 +1054,7 @@ function startListeners(){
       window.allHydroPrime=[];
       snap.forEach(d=>window.allHydroPrime.push({id:d.id,...d.data()}));
       if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='accueil' && session.role==='administrateur') renderAccueilAdmin();
     }, err=>toast('Erreur lecture HydroPrime: '+err.message,'err'));
   }
 
@@ -1507,7 +1508,8 @@ function renderAccueilAdmin(){
   const avisInstal=allRecords.filter(r=>r.statut==="Avis d'installation");
   const byAsm={};
   [...fabrique,...avisInstal].forEach(r=>{
-    const asm=r.nom_assembleur||'—';
+    const asm=r.nom_assembleur||'';
+    if(!asm) return; // ignorer les records sans assembleur
     if(!byAsm[asm])byAsm[asm]={fab:0,avis:0};
     if(r.statut==='Fabriqué')byAsm[asm].fab++;
     else byAsm[asm].avis++;
@@ -1659,7 +1661,8 @@ function openInventairePopup(){
   const avisInstal=allRecords.filter(r=>r.statut==="Avis d'installation");
   const byAsm={};
   [...fabrique,...avisInstal].forEach(r=>{
-    const asm=r.nom_assembleur||'—';
+    const asm=r.nom_assembleur||'';
+    if(!asm) return; // ignorer sans assembleur
     if(!byAsm[asm])byAsm[asm]={fab:[],avis:[]};
     if(r.statut==='Fabriqué')byAsm[asm].fab.push(r);
     else byAsm[asm].avis.push(r);
@@ -2149,9 +2152,9 @@ function renderDashboard(){
     return entries.map(([prod,cnt])=>{
       const clickAttr=clickProduit?`onclick="asmView='stock';asmStockProdFilter='${prod.replace(/'/g,"\\'").replace(/"/g,'&quot;')}';renderDashboard()" style="cursor:pointer"`:'';
       const hoverStyle=clickProduit?` onmouseover="this.style.background='${color}18'" onmouseout="this.style.background=''"`:''
-      return`<div ${clickAttr}${hoverStyle} style="margin-bottom:10px;padding:${clickProduit?'4px 6px':'0'};border-radius:4px;transition:background .15s">
+      return`<div ${clickAttr}${hoverStyle} style="margin-bottom:10px;padding:4px 6px;border-radius:4px;transition:background .15s">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <span style="font-size:.78rem;color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px" title="${esc(prod)}">${esc(prod)}</span>
+          <span style="font-size:.78rem;color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${esc(prod)}">${esc(prod)}</span>
           <span style="font-family:var(--cond);font-size:.85rem;font-weight:700;color:${color};margin-left:8px">${cnt}</span>
         </div>
         <div style="height:7px;border-radius:4px;background:var(--mist);overflow:hidden">
@@ -2797,6 +2800,11 @@ function openHpPopup(nomEntreprise, type, hpUtilises){
   overlay.style.display='flex';
 }
 
+function hpTableRetour(){
+  if(session.role==='conseiller') goConsDashboard();
+  else switchPanel('accueil',null);
+}
+
 function renderHydroPrimeTable(filtre){
   const allHP=window.allHydroPrime||[];
   const consNom=session.role==='conseiller'?((session.prenom||'')+' '+(session.nom||'')).trim():'';
@@ -2859,7 +2867,7 @@ function renderHydroPrimeTable(filtre){
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
       <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="goConsDashboard()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <button onclick="hpTableRetour()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
         </button>
         <div>
