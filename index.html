@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.7 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.8 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1193,6 +1193,14 @@ function renderComptabilite(){
         <div class="page-title">💰 Installateurs &amp; Hydro-Prime</div>
         <div class="page-sub">${rows.length} entreprise${rows.length!==1?'s':''} — Téléphone, Courriel éditables</div>
       </div>
+      <div class="page-actions">
+        <button class="btn btn-blue" onclick="openJournalGlobalHpModal()" style="background:var(--blue);border-color:var(--blue)">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Journal global
+        </button>
+        <button class="btn btn-blue" onclick="exportComptabiliteXLSX()" style="background:#217346;border-color:#217346">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter XLSX
+        </button>
+      </div>
     </div>
     <div class="tbl-card">
       <div class="tbl-scroll">
@@ -1382,6 +1390,112 @@ async function openJournalHpModal(hpId, compagnie){
 
 
 // ════════════════════════════════════════════════════════
+// JOURNAL HP GLOBAL + EXPORT XLSX COMPTABILITÉ
+// ════════════════════════════════════════════════════════
+async function openJournalGlobalHpModal(){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:780px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--blue)">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">📋 Journal HP — Toutes les entreprises</div>
+      <div style="font-size:.75rem;color:var(--slate);margin-top:2px">Historique complet des utilisations Hydro-Prime</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="exportJournalGlobalXLSX()" style="padding:6px 12px;border-radius:var(--r);border:2px solid #217346;background:#f0fdf4;color:#217346;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>
+          Exporter XLSX
+        </button>
+        <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div id="journal-global-body" style="overflow-y:auto;flex:1;padding:16px">
+      <div style="text-align:center;padding:20px;color:var(--slate);font-size:.82rem">Chargement…</div>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+  try{
+    const snap=await FB.getDocs(FB.collection(FB.db,'HydroPrimeJournal'));
+    const entries=[];
+    snap.forEach(d=>entries.push({id:d.id,...d.data()}));
+    entries.sort((a,b)=>(b.date_creation?.seconds||0)-(a.date_creation?.seconds||0));
+    window._journalGlobalEntries=entries; // pour export
+    const body=document.getElementById('journal-global-body');
+    if(!body)return;
+    if(!entries.length){body.innerHTML='<div style="text-align:center;padding:30px;color:var(--slate);font-size:.82rem">Aucune utilisation enregistrée</div>';return;}
+    const rowsHtml=entries.map((e,i)=>{
+      const dateStr=e.date_creation?new Date(e.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      return `<tr style="background:${i%2?'#f7f9fb':'#fff'}">
+        <td style="padding:7px 12px;font-size:.78rem;white-space:nowrap">${dateStr}</td>
+        <td style="padding:7px 12px;font-size:.78rem;font-weight:600">${esc(e.nom_entreprise||'—')}</td>
+        <td style="padding:7px 12px;text-align:center;font-family:var(--cond);font-weight:800;color:#dc2626">${e.qte_utilisee||0}</td>
+        <td style="padding:7px 12px;font-size:.78rem;font-weight:600">${esc(e.no_facture||'—')}</td>
+        <td style="padding:7px 12px;font-size:.78rem;color:var(--slate)">${esc(e.utilisateur||'—')}</td>
+        <td style="padding:7px 12px;text-align:center;font-family:var(--cond);font-weight:700;color:var(--green-dark)">${e.hp_restants_apres!=null?e.hp_restants_apres:'—'}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML=`<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--blue)">
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">Date</th>
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">Entreprise</th>
+        <th style="padding:8px 12px;text-align:center;font-size:.72rem;color:#fff">HP utilisés</th>
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">N° Facture</th>
+        <th style="padding:8px 12px;text-align:left;font-size:.72rem;color:#fff">Utilisateur</th>
+        <th style="padding:8px 12px;text-align:center;font-size:.72rem;color:#fff">HP restants après</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+  }catch(err){
+    const body=document.getElementById('journal-global-body');
+    if(body)body.innerHTML=`<div style="padding:20px;color:var(--err)">Erreur: ${esc(err.message)}</div>`;
+  }
+}
+
+function exportJournalGlobalXLSX(){
+  const entries=window._journalGlobalEntries||[];
+  if(!entries.length){toast('Aucune donnée à exporter','err');return;}
+  loadXLSX(()=>{
+    const headers=['Date','Entreprise','HP utilisés','N° Facture','Utilisateur','HP restants après'];
+    const data=entries.map(e=>[
+      e.date_creation?new Date(e.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',
+      e.nom_entreprise||'',e.qte_utilisee||0,e.no_facture||'',e.utilisateur||'',e.hp_restants_apres!=null?e.hp_restants_apres:''
+    ]);
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=[{wch:22},{wch:28},{wch:12},{wch:18},{wch:24},{wch:16}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(ws[addr])ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1B5FA8'}},alignment:{horizontal:'center'}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Journal HP');
+    XLSX.writeFile(wb,'HydroPrime_Journal_'+nowStr()+'.xlsx');
+    toast('Journal exporté ✓');
+  });
+}
+
+function exportComptabiliteXLSX(){
+  const allHP=window.allHydroPrime||[];
+  const entreprises=allUsers.filter(u=>u.role==='entreprise').sort((a,b)=>(a.compagnie||'').localeCompare(b.compagnie||'','fr'));
+  const rows=entreprises.map(u=>{
+    const hp=allHP.find(h=>(h.nom_entreprise||'')===(u.compagnie||''))||{};
+    return[u.compagnie||'',u.telephone||'',u.email||'',hp.hp_cumules||0,hp.hp_utilises||0,hp.hp_restants||0];
+  });
+  loadXLSX(()=>{
+    const headers=['Compagnie','Téléphone','Courriel','HP Cumulés','HP Utilisés','HP Restants'];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+    ws['!cols']=[{wch:28},{wch:16},{wch:28},{wch:12},{wch:12},{wch:12}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(ws[addr])ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'B45309'}},alignment:{horizontal:'center'}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Comptabilité HP');
+    XLSX.writeFile(wb,'Comptabilite_HP_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
+}
+
+// ════════════════════════════════════════════════════════
 // ACCUEIL ADMIN
 // ════════════════════════════════════════════════════════
 function renderAccueilAdmin(){
@@ -1493,15 +1607,15 @@ function renderAccueilAdmin(){
 
       <!-- Carte : Hydro-Prime -->
       <div style="grid-column:1/-1;background:#fff;border-radius:10px;border-left:5px solid #f59e0b;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:0;overflow:hidden">
-        <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist);cursor:pointer" onclick="switchPanel('comptabilite',null)">
-          <div style="display:flex;align-items:center;gap:12px">
+        <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist)">
+          <div style="display:flex;align-items:center;gap:12px;cursor:pointer;flex:1" onclick="switchPanel('comptabilite',null)">
             <span style="font-size:1.8rem">💰</span>
             <div>
               <div style="font-family:var(--cond);font-size:1.05rem;font-weight:800;color:var(--charcoal)">Gestion Hydro-Prime</div>
               <div style="font-size:.73rem;color:var(--slate);margin-top:2px">Tableau complet — HP cumulés, utilisés, restants, journal</div>
             </div>
           </div>
-          <div style="display:flex;gap:20px;align-items:center">
+          <div style="display:flex;gap:12px;align-items:center">
             <div style="text-align:center">
               <div style="font-family:var(--cond);font-size:1.4rem;font-weight:800;color:#b45309">${(window.allHydroPrime||[]).reduce((s,h)=>s+(h.hp_cumules||0),0)}</div>
               <div style="font-size:.65rem;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">HP Cumulés</div>
@@ -1516,7 +1630,11 @@ function renderAccueilAdmin(){
               <div style="font-family:var(--cond);font-size:1.4rem;font-weight:800;color:var(--green-dark)">${(window.allHydroPrime||[]).reduce((s,h)=>s+(h.hp_restants||0),0)}</div>
               <div style="font-size:.65rem;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">HP Restants</div>
             </div>
-            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            <div style="width:1px;height:30px;background:var(--mist)"></div>
+            <button onclick="openJournalGlobalHpModal()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--blue);background:var(--blue-pale);color:var(--blue);font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>
+              Journal global
+            </button>
           </div>
         </div>
       </div>
@@ -1604,16 +1722,23 @@ function openBulkAddModal(){
           </select></div>
       </div>
 
-      <div style="border-top:2px dashed var(--mist);padding-top:14px;margin-top:4px">
+        <div style="border-top:2px dashed var(--mist);padding-top:14px;margin-top:4px">
         <div style="font-family:var(--cond);font-size:.82rem;font-weight:700;color:var(--charcoal);margin-bottom:10px">Lignes par modèle de produit :</div>
-        <div id="bulk-lines" style="display:flex;flex-direction:column;gap:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead><tr style="background:var(--cloud)">
+            <th style="padding:6px 10px;text-align:left;font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px;border:1px solid var(--mist)">Produit</th>
+            <th style="padding:6px 10px;text-align:center;font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px;border:1px solid var(--mist);width:70px">Qté</th>
+            <th style="padding:6px 10px;text-align:left;font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px;border:1px solid var(--mist)">N° de série</th>
+          </tr></thead>
+          <tbody id="bulk-lines">
           ${window_params.produits_principaux.map((p,i)=>`
-            <div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:8px;align-items:center">
-              <span style="font-size:.82rem;font-weight:600;color:var(--charcoal)">${esc(p)}</span>
-              <input type="number" id="bulk-qty-${i}" min="0" value="0" placeholder="Qté" style="padding:5px 8px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;width:100%"/>
-              <div id="bulk-serials-${i}" style="display:none;flex-direction:column;gap:4px"></div>
-            </div>`).join('')}
-        </div>
+            <tr style="border-bottom:1px solid var(--mist)">
+              <td style="padding:7px 10px;font-weight:600;color:var(--charcoal);border:1px solid var(--mist)">${esc(p)}</td>
+              <td style="padding:7px 8px;border:1px solid var(--mist);text-align:center"><input type="number" id="bulk-qty-${i}" min="0" value="0" placeholder="0" style="padding:4px 6px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;width:56px;text-align:center"/></td>
+              <td style="padding:7px 10px;border:1px solid var(--mist)"><div id="bulk-serials-${i}" style="display:flex;flex-direction:column;gap:4px"></div></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
         <button onclick="generateBulkSerialFields()" style="margin-top:10px;padding:6px 14px;border-radius:var(--r);border:2px solid #0f766e;background:transparent;color:#0f766e;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🔢 Générer les champs N° de série</button>
       </div>
     </div>
@@ -1793,7 +1918,7 @@ function renderCommentaires(){
         <td style="text-align:center;color:#f59e0b;font-size:.9rem;white-space:nowrap">${stars(r.note)}</td>
         <td style="white-space:nowrap;color:var(--slate);font-size:.8rem">${r.date_creation?new Date(r.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}</td>
         <td style="min-width:180px">
-          <textarea onblur="saveCommentaireField('${r.id}','suivi',this.value)" rows="2" placeholder="Notes de suivi…" style="width:100%;padding:5px 8px;border:1px solid var(--mist);border-radius:4px;font-size:.78rem;font-family:inherit;resize:vertical;box-sizing:border-box">${esc(r.suivi||'')}</textarea>
+          <textarea onblur="saveCommentaireField('${r.id}','suivi',this.value)" rows="4" placeholder="Notes de suivi…" style="width:100%;padding:5px 8px;border:1px solid var(--mist);border-radius:4px;font-size:.78rem;font-family:inherit;resize:vertical;box-sizing:border-box;min-height:80px">${esc(r.suivi||'')}</textarea>
         </td>
       </tr>`).join('')
       :`<tr><td colspan="12"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg><p>Aucun commentaire</p></div></td></tr>`;
@@ -2351,29 +2476,38 @@ function renderConseillerDashboard(){
               <span style="color:#dc2626">🔴 ⚠ Date passée</span>
             </div>
             <div style="flex:1;overflow-y:auto;padding:0 0 8px">
-              ${avisNonLivres.length?avisNonLivres.map(r=>{
-                const rec=allRecords.find(x=>x.no_serie_hk===r.no_serie_hk);
-                const statut=r.no_serie_hk?(rec?rec.statut||'—':"Avis d'installation"):'Sans N° HK';
-                const isRetard=r.date_installation&&new Date(r.date_installation+'T12:00:00')<new Date();
-                const hkSafe=(r.no_serie_hk||'').replace(/'/g,"\\'");
-                const avisObj=(window.allAvisInstal||[]).find(a=>a.id===r.id);
-                const avisHk=(window.allAvisInstal||[]).find(a=>a.no_serie_hk===r.no_serie_hk);
-                // Popup disponible via id de l'avis (pas de HK requis) ou via HK
-                const avisId=r.id||'';
-                return`<div style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-bottom:1px solid var(--mist)">
-                  <span style="font-size:.78rem;flex-shrink:0;color:${isRetard?'#dc2626':'transparent'}" title="${isRetard?'Date passée':''}">⚠</span>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:.78rem;font-weight:600;color:var(--charcoal);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.nom_entreprise_install||r.nom_entrepreneur||'—')}</div>
-                    <div style="font-size:.68rem;color:var(--slate);margin-top:1px">${esc(r.ville_site||'')}${r.date_installation?' — '+esc(r.date_installation):''}</div>
-                  </div>
-                  <button onclick="openAvisPopupById('${avisId.replace(/'/g,"\\'")}')" title="Voir l'avis d'installation" style="flex-shrink:0;padding:4px 6px;border-radius:3px;background:var(--blue-pale);border:1px solid var(--blue);color:var(--blue);font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:3px">
-                    <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>
-                    Avis
-                  </button>
-                </div>`;
-              }).join('')
-              :'<div style="font-size:.8rem;color:var(--green-dark);padding:16px 12px;text-align:center">✓ Tous les avis sont livrés</div>'}
-            </div>
+              ${(()=>{
+                if(!avisNonLivres.length) return '<div style="font-size:.8rem;color:var(--green-dark);padding:16px 12px;text-align:center">✓ Tous les avis sont livrés</div>';
+                const byEnt={};
+                avisNonLivres.forEach(r=>{
+                  const ent=r.nom_entreprise_install||r.nom_entrepreneur||'—';
+                  if(!byEnt[ent])byEnt[ent]=[];
+                  byEnt[ent].push(r);
+                });
+                return Object.entries(byEnt).sort((a,b)=>a[0].localeCompare(b[0],'fr')).map(([ent,avis])=>{
+                  const hasRetard=avis.some(r=>r.date_installation&&new Date(r.date_installation+'T12:00:00')<new Date());
+                  const items=avis.map(r=>{
+                    const isRetard=r.date_installation&&new Date(r.date_installation+'T12:00:00')<new Date();
+                    const avisId=r.id||'';
+                    return `<div style="display:flex;align-items:center;gap:5px;padding:5px 12px 5px 24px;border-bottom:1px solid var(--mist)">
+                      <span style="font-size:.72rem;flex-shrink:0;color:${isRetard?'#dc2626':'transparent'}">⚠</span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:.73rem;color:var(--steel)">${esc(r.produit_principal||'—')}${r.ville_site?' — '+esc(r.ville_site):''}</div>
+                        <div style="font-size:.68rem;color:var(--slate)">${r.date_installation?esc(r.date_installation):''}</div>
+                      </div>
+                      <button onclick="openAvisPopupById('${avisId.replace(/'/g,"\\'")}' )" style="flex-shrink:0;padding:3px 6px;border-radius:3px;background:var(--blue-pale);border:1px solid var(--blue);color:var(--blue);font-size:.68rem;cursor:pointer">Avis</button>
+                    </div>`;
+                  }).join('');
+                  return `<div style="border-bottom:2px solid var(--mist)">
+                    <div style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:${hasRetard?'#fff5f5':'#f0f9ff'}">
+                      <span style="font-size:.72rem;color:${hasRetard?'#dc2626':'#0891b2'}">${hasRetard?'⚠':'🔵'}</span>
+                      <span style="font-size:.78rem;font-weight:700;color:var(--charcoal);flex:1">${esc(ent)}</span>
+                      <span style="font-family:var(--cond);font-size:.72rem;font-weight:800;color:${hasRetard?'#dc2626':'#0891b2'};background:${hasRetard?'#fee2e2':'#e0f2fe'};padding:1px 7px;border-radius:10px">${avis.length}</span>
+                    </div>
+                    ${items}
+                  </div>`;
+                }).join('');
+              })()}
           </div>
         </div>
       </div>
@@ -3217,22 +3351,6 @@ function openAttrStep2(){
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Date de livraison assembleur</label>
               <input type="date" id="attr-date-livraison" value="${esc(avis.date_installation||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
 
-            <div>
-              <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Type client</label>
-              <select id="attr-type-client" onchange="attrToggleDistributeur(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box">
-                <option value="Entrepreneur direct"${initType==='Entrepreneur direct'?' selected':''}>Entrepreneur direct</option>
-                <option value="Distributeur"${initType==='Distributeur'?' selected':''}>Distributeur</option>
-              </select>
-            </div>
-
-            <div id="attr-dist-row" style="display:${isDist?'block':'none'}">
-              <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom du distributeur</label>
-              <select id="attr-nom-distributeur" style="width:100%;padding:6px 10px;border:1px solid #f59e0b;border-radius:var(--r);font-size:.83rem;margin-top:3px;background:#fffbeb;box-sizing:border-box">
-                <option value="">— Choisir un distributeur —</option>
-                ${distOpts}
-              </select>
-            </div>
-
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Adresse du site</label>
               <input id="attr-adresse" value="${esc(avis.no_civique_rue||avis.adresse_site||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
 
@@ -3244,11 +3362,12 @@ function openAttrStep2(){
 
             <div>
               <label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Statut *</label>
-              <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
-                <button id="stat-dist" onclick="setAttrStatut('Livré vers distributeur')" style="display:${isDist?'flex':'none'};padding:9px 12px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;align-items:center;gap:6px">🚚 Livré vers le distributeur</button>
-                <button id="stat-ent"  onclick="setAttrStatut('Livré vers entreprise')"  style="display:${!isDist?'flex':'none'};padding:9px 12px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;align-items:center;gap:6px">🏢 Livré vers l'entreprise</button>
+              <div style="margin-top:6px">
+                <button id="stat-ent" onclick="setAttrStatut('Livré vers entreprise')" style="display:flex;padding:9px 12px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer;align-items:center;gap:6px;width:100%">🏢 Livré vers l'installateur autorisé</button>
               </div>
               <input type="hidden" id="attr-statut" value=""/>
+              <input type="hidden" id="attr-type-client" value="Entrepreneur direct"/>
+              <input type="hidden" id="attr-nom-distributeur" value=""/>
             </div>
 
           </div>
@@ -3415,9 +3534,11 @@ function renderTableauFiltered(){
     }
   }
 
-  // Filtre produit pour stock assembleur + forcer statut Fabriqué uniquement (exclut livrés)
+  // Filtre produit pour stock assembleur + forcer statut Fabriqué + exclure HK déjà livrés ailleurs
   if(asmView==='stock'){
-    rows=rows.filter(r=>r.statut==='Fabriqué' && !r._fromAvis);
+    // Ensemble des N° HK qui ont un statut Livré dans allRecords
+    const hkLivres=new Set(allRecords.filter(r=>r.statut&&r.statut.startsWith('Livré')&&r.no_serie_hk).map(r=>r.no_serie_hk));
+    rows=rows.filter(r=>r.statut==='Fabriqué' && !r._fromAvis && (!r.no_serie_hk||!hkLivres.has(r.no_serie_hk)));
     if(asmStockProdFilter) rows=rows.filter(r=>(r.produit_principal||'')===asmStockProdFilter);
   }
   if(asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'){
@@ -3705,8 +3826,7 @@ const COLS_ASM=[
   {k:'produit2',             l:'Produit #2',        t:'prod2'},
   {k:'produit3',             l:'Produit #3',        t:'prod3'},
   {k:'conseiller',           l:'Conseiller',        t:'cons', ro:true},
-  {k:'nom_entrepreneur',     l:'Entreprise cliente (entrepreneur)'},
-  {k:'nom_installateur',     l:'Installateur autorisé (généralement même entreprise)', ro:true},
+  {k:'nom_entrepreneur',     l:'Installateur autorisé'},
   {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
   {k:'type_client',          l:"Entrepreneur direct ou distributeur ?", t:'sel', opts:['Entrepreneur direct','Distributeur']},
   {k:'nom_distributeur',     l:'Nom du distributeur'},
@@ -3793,7 +3913,8 @@ function getRows(){
 // ════════════════════════════════════════════════════════
 // TABLEAU
 // ════════════════════════════════════════════════════════
-function renderTableau(){
+function renderTableau(keepFocus){
+  const _selStart = keepFocus ? document.getElementById('tbl-search-input')?.selectionStart : null;
   const isAdmin=session.role==='administrateur';
   const isDist=session.role==='distributeur';
   const isCons=session.role==='conseiller';
@@ -3868,7 +3989,7 @@ function renderTableau(){
     <div class="toolbar">
       <div class="search-wrap">
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input class="search-input" type="text" placeholder="Recherche N° HK, client, ville…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderTableau()"/>
+        <input id="tbl-search-input" class="search-input" type="text" placeholder="Recherche N° HK, client, ville…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderTableau(true)"/>
       </div>
       ${filters}${isCons?`<span class="result-info" style="margin-left:0">MRC autorisées : <strong>${(session.mrcs||[]).join(', ')||'—'}</strong></span>`:''}
       <button class="btn btn-secondary btn-sm" onclick="searchQ='';fAsm='';fDist='';fSt='';renderTableau()">✕ Effacer</button>
@@ -3895,6 +4016,11 @@ function renderTableau(){
         </table>
       </div>
     </div>`;
+  // Restaurer le focus sur la barre de recherche si keepFocus
+  if(keepFocus && _selStart!==null){
+    const inp=document.getElementById('tbl-search-input');
+    if(inp){inp.focus();try{inp.setSelectionRange(_selStart+1,_selStart+1);}catch(e){}}
+  }
 }
 
 function rowHtml(row,cols){
