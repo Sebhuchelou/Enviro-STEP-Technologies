@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.3 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.4 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1280,6 +1280,45 @@ function renderAccueilAdmin(){
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:1100px">
+
+      <!-- Carte : Inventaire par assembleur — EN PREMIÈRE POSITION -->
+      <div style="grid-column:1/-1;background:linear-gradient(135deg,#1e2530 0%,#2c3441 100%);border-radius:12px;box-shadow:0 4px 24px rgba(30,37,48,.18);padding:0;overflow:hidden">
+        <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.8rem">🏭</span>
+            <div>
+              <div style="font-family:var(--cond);font-size:1.05rem;font-weight:800;color:#fff">Inventaire par assembleur</div>
+              <div style="font-size:.73rem;color:rgba(255,255,255,.5);margin-top:2px">Cliquer sur une ligne pour filtrer le tableau de suivi</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="text-align:center">
+              <div style="font-family:var(--cond);font-size:1.6rem;font-weight:800;color:#4caf1a">${fabrique.length}</div>
+              <div style="font-size:.65rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Fabriqués</div>
+            </div>
+            <div style="width:1px;height:36px;background:rgba(255,255,255,.12)"></div>
+            <div style="text-align:center">
+              <div style="font-family:var(--cond);font-size:1.6rem;font-weight:800;color:#60a5fa">${avisInstal.length}</div>
+              <div style="font-size:.65rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Avis</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:rgba(255,255,255,.06);max-height:220px;overflow-y:auto">
+          ${Object.entries(byAsm).length
+            ? Object.entries(byAsm).sort((a,b)=>a[0].localeCompare(b[0])).map(([asm,counts])=>`
+              <div onclick="filterTableauByAsm('${asm.replace(/'/g,"\\'")}')" style="background:#1e2530;padding:12px 16px;cursor:pointer;transition:background .15s;display:flex;flex-direction:column;gap:6px" onmouseover="this.style.background='#2c3441'" onmouseout="this.style.background='#1e2530'">
+                <div style="font-family:var(--cond);font-size:.83rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(asm)}">${esc(asm)}</div>
+                <div style="display:flex;gap:6px">
+                  <span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:rgba(76,175,26,.15);color:#4caf1a;border:1px solid rgba(76,175,26,.3)">⚙️ ${counts.fab} Fab.</span>
+                  <span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:rgba(96,165,250,.12);color:#60a5fa;border:1px solid rgba(96,165,250,.25)">📋 ${counts.avis} Avis</span>
+                </div>
+              </div>`)
+            .join('')
+            : '<div style="padding:20px;color:rgba(255,255,255,.4);font-size:.82rem;grid-column:1/-1">Aucun enregistrement actif</div>'
+          }
+        </div>
+      </div>
+
       ${cards.map(c=>`
         <div onclick="switchPanel('${c.panel}',null)" style="background:#fff;border-radius:10px;border-left:5px solid ${c.color};box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
           <div style="font-size:2.2rem;flex-shrink:0">${c.icon}</div>
@@ -1289,18 +1328,6 @@ function renderAccueilAdmin(){
           </div>
           <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         </div>`).join('')}
-
-      <!-- Carte : Inventaire par assembleur -->
-      <div style="background:#fff;border-radius:10px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);padding:0;overflow:hidden">
-        <div style="padding:14px 18px;border-bottom:2px solid var(--mist);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openInventairePopup()">
-          <span style="font-size:1.6rem">🏭</span>
-          <div>
-            <div style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:var(--charcoal)">Inventaire par assembleur</div>
-            <div style="font-size:.75rem;color:var(--slate)">Fabriqués & Avis en attente — cliquer pour détail</div>
-          </div>
-        </div>
-        <div style="max-height:180px;overflow-y:auto">${asmRows}</div>
-      </div>
 
       <!-- Carte : Ajout en lot -->
       <div style="background:#fff;border-radius:10px;border-left:5px solid #0f766e;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onclick="openBulkAddModal()" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
@@ -1322,6 +1349,13 @@ function renderAccueilAdmin(){
         <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
     </div>`;
+}
+
+// Filtre le tableau de suivi par assembleur depuis la carte inventaire
+function filterTableauByAsm(asmName){
+  fAsm = asmName;
+  asmView = null;
+  switchPanel('tableau', null);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1594,6 +1628,11 @@ function renderCommentaires(){
         <div class="page-header">
           <div><div class="page-title">💬 Commentaires Beta Test</div>
           <div class="page-sub">${rows.length} commentaire${rows.length!==1?'s':''}</div></div>
+          <div class="page-actions">
+            <button class="btn btn-blue" onclick="exportCommentairesXLSX()" style="background:#217346;border-color:#217346">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter XLSX
+            </button>
+          </div>
         </div>
         <div class="tbl-card"><div class="tbl-scroll"><table>
           <thead><tr>
@@ -1622,6 +1661,48 @@ function deleteCommentaire(id){
       toast('Commentaire supprimé ✓','warn');
     }catch(e){toast('Erreur: '+e.message,'err');}
     setSyncing(false);
+  });
+}
+
+function exportCommentairesXLSX(){
+  loadXLSX(()=>{
+    FB.getDocs(FB.query(FB.collection(FB.db,'CommentaireAppli'))).then(snap=>{
+      const rows=[];
+      snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+      const statutOrder={'Nouveau':0,'En cours':1,'Terminé':2};
+      rows.sort((a,b)=>{
+        const sa=statutOrder[a.statut_suivi||'Nouveau']??0;
+        const sb=statutOrder[b.statut_suivi||'Nouveau']??0;
+        if(sa!==sb)return sa-sb;
+        return (b.date_creation?.seconds||0)-(a.date_creation?.seconds||0);
+      });
+      const headers=['Statut','Identification','Nom','Prénom','Rôle','Compagnie','Courriel','Avis','Note','Date','Suivi'];
+      const data=rows.map(r=>[
+        r.statut_suivi||'Nouveau',
+        r.identification||'',
+        r.nom||'',
+        r.prenom||'',
+        r.role||'',
+        r.compagnie||'',
+        r.courriel||'',
+        r.votre_avis||'',
+        r.note||'',
+        r.date_creation?new Date(r.date_creation.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric'}):'',
+        r.suivi||''
+      ]);
+      const wb=XLSX.utils.book_new();
+      const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+      ws['!cols']=headers.map((_,i)=>({wch:i===7||i===10?40:i===0?12:18}));
+      const range=XLSX.utils.decode_range(ws['!ref']);
+      for(let C=range.s.c;C<=range.e.c;C++){
+        const addr=XLSX.utils.encode_cell({r:0,c:C});
+        if(!ws[addr])continue;
+        ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'f59e0b'.replace('#','')}},alignment:{horizontal:'center',wrapText:true}};
+      }
+      XLSX.utils.book_append_sheet(wb,ws,'Commentaires Beta');
+      XLSX.writeFile(wb,'Commentaires_BetaTest_'+nowStr()+'.xlsx');
+      toast('Export XLSX téléchargé ✓');
+    }).catch(e=>toast('Erreur export: '+e.message,'err'));
   });
 }
 
@@ -1913,7 +1994,7 @@ function renderDashboard(){
           ${(()=>{
             const byProd={};
             avisMe.forEach(r=>{const p=r.produit_principal||'Non défini';if(!byProd[p])byProd[p]=[];byProd[p].push(r);});
-            const entries=Object.entries(byProd).sort((a,b)=>b[1].length-a[1].length);
+            const entries=Object.entries(byProd).sort((a,b)=>a[0].localeCompare(b[0],'fr'));
             if(!entries.length) return'<div style="color:var(--slate);font-size:.8rem">Aucun avis à traiter</div>';
             return entries.map(([prod,list])=>`
               <button onclick="openAvisAttributionModal('${esc(prod).replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 14px;margin-bottom:8px;border-radius:6px;border:2px solid #0891b2;background:#f0f9ff;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background='#f0f9ff'">
@@ -3226,32 +3307,10 @@ function renderTableauFiltered(){
   const isAsmStock = asmView==='stock' && session.role==='assembleur';
   const viewCols = isAsmStock ? COLS_STOCK_ASM : allCols;
 
-  // Vue stock assembleur : regroupement avis par entreprise
+  // Vue stock assembleur : regroupement avis par entreprise — DÉSACTIVÉ (non affiché)
+  // Vue stock assembleur : liste jaune désactivée à la demande
   let avisGroupHtml = '';
-  if(isAsmStock){
-    const avisNonLivres=(window.allAvisInstal||[]).filter(a=>
-      !a.no_serie_hk && (a.assembleur_attribue||'')===(session.compagnie||'')
-    );
-    if(avisNonLivres.length){
-      // Regrouper par entreprise
-      const byEnt={};
-      avisNonLivres.forEach(a=>{
-        const ent=a.nom_entreprise_install||a.nom_entrepreneur||'—';
-        if(!byEnt[ent])byEnt[ent]=[];
-        byEnt[ent].push(a);
-      });
-      const entRows=Object.entries(byEnt).sort((a,b)=>a[0].localeCompare(b[0])).map(([ent,avis])=>`
-        <tr style="background:#fef3c7">
-          <td colspan="2" style="padding:6px 10px;font-family:var(--cond);font-weight:800;font-size:.82rem;color:#92400e">🏢 ${esc(ent)}</td>
-          <td colspan="5" style="padding:6px 10px;color:#b45309;font-size:.78rem">${avis.map(a=>`${esc(a.produit_principal||'—')} — ${esc(a.ville_site||'—')} (${esc(a.date_installation||'sans date')})`).join(' &nbsp;|&nbsp; ')}</td>
-        </tr>`).join('');
-      avisGroupHtml=`
-        <div style="margin-bottom:12px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;overflow:hidden">
-          <div style="background:#f59e0b;padding:8px 14px;font-family:var(--cond);font-weight:800;font-size:.82rem;color:#fff">📌 Avis non livrés — ${avisNonLivres.length} en attente (regroupés par entreprise)</div>
-          <table style="width:100%;border-collapse:collapse"><tbody>${entRows}</tbody></table>
-        </div>`;
-    }
-  }
+  // (bloc supprimé intentionnellement)
 
   const tblRows=rows.length
     ?rows.map(r=>rowHtml(r,viewCols)).join('')
@@ -3322,7 +3381,7 @@ const COLS_ADMIN=[
   {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
   {k:'po_assembleur',        l:'#PO Assembleur'},
   {k:'po_norweco',           l:'#PO Norweco'},
-  {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
+  {k:'nom_assembleur',       l:'Nom de l\'Assembleur', t:'asm'},
   {k:'recu_le',              l:'Date réception assembleur',t:'date'},
   {k:'no_serie_hk',          l:'N° Série HK',hk:true},
   {k:'produit_principal',    l:'Produit Principal', t:'prod1'},
@@ -3505,6 +3564,9 @@ function renderTableau(){
       <div class="page-actions">
         ${!isCons?`<button class="btn btn-primary" onclick="addRow()">
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle ligne
+        </button>
+        <button class="btn btn-secondary" onclick="openBulkAddModal()" style="background:#0f766e;border-color:#0f766e;color:#fff">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2zM3 3h18v2H3zm0 14h4v2H3z"/></svg>Ajout en lot
         </button>`:''}
         <button class="btn btn-blue" onclick="exportXLSX()" style="background:#217346;border-color:#217346">
           <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter
@@ -3552,13 +3614,34 @@ function rowHtml(row,cols){
   const isE=editingId===row.id;
   const isAdmin=session.role==='administrateur';
   const chkCell=isAdmin?`<td style="padding:9px 8px;text-align:center"><input type="checkbox" class="row-chk" data-id="${row.id}" ${selectedRows.has(row.id)?'checked':''} onchange="toggleRowSelect('${row.id}')" style="cursor:pointer;width:15px;height:15px"/></td>`:'';
+
+  // Logique grisage distributeur : si type_client = Distributeur ET statut != Livré vers entreprise → champs post-distributeur grisés
+  const typeClientActif = isE ? (editBuf.type_client||row.type_client||'') : (row.type_client||'');
+  const statutActif = isE ? (editBuf.statut||row.statut||'') : (row.statut||'');
+  const isDist = typeClientActif === 'Distributeur';
+  const isLivreEntreprise = statutActif === 'Livré vers entreprise';
+  // Champs bloqués quand distributeur non encore livré vers entreprise
+  const DIST_LOCKED_KEYS = ['nom_entrepreneur','nom_installateur','adresse_site','ville_livraison','date_livraison_dist','notes_distributeur','identification_site'];
+
   const cells=cols.map(c=>{
-    const v=row[c.k]??'';
+    const v=isE?(editBuf[c.k]??row[c.k]??''):(row[c.k]??'');
+    const distLocked = isDist && !isLivreEntreprise && DIST_LOCKED_KEYS.includes(c.k);
     if(isE){
+      if(distLocked) return`<td style="background:#f1f5f9;color:var(--silver);text-align:center" title="Disponible après livraison entreprise">—</td>`;
       if(c.ro) return`<td>${esc(v)||'—'}</td>`; // lecture seule
-      if(c.t==='sel'){const o=c.opts.map(x=>`<option value="${esc(x)}"${v===x?' selected':''}>${esc(x)}</option>`).join('');return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='sel'){
+        const o=c.opts.map(x=>`<option value="${esc(x)}"${v===x?' selected':''}>${esc(x)}</option>`).join('');
+        // Si c'est type_client, on déclenche un refresh de la ligne pour le grisage dynamique
+        if(c.k==='type_client') return`<td><select onchange="editBuf['${c.k}']=this.value;if(asmView)renderTableauFiltered();else renderTableau()">${o}</select></td>`;
+        return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`;
+      }
       if(c.t==='prod1'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_principaux,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
       if(c.t==='prod2'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_2,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='asm'){
+        const assembleurs=(allUsers||[]).filter(u=>u.role==='assembleur'&&u.actif!==false).map(u=>u.compagnie||'').filter(Boolean).sort();
+        const o=`<option value="">—</option>`+assembleurs.map(a=>`<option value="${esc(a)}"${v===a?' selected':''}>${esc(a)}</option>`).join('');
+        return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`;
+      }
       if(c.t==='prod3'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_3,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
       if(c.t==='cons'){
         const conseillers=(allUsers||[]).filter(u=>u.role==='conseiller'&&u.actif!==false).map(u=>((u.prenom||'')+' '+(u.nom||'')).trim()).filter(Boolean).sort();
@@ -3570,6 +3653,8 @@ function rowHtml(row,cols){
       if(c.k==='dernier_utilisateur'||c.k==='derniere_modif')return`<td>${esc(v)||'—'}</td>`;
       return`<td><input type="text" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
     }
+    // Mode lecture
+    if(distLocked) return`<td style="background:#f1f5f9;color:var(--silver);text-align:center" title="N/A — Livraison via distributeur">—</td>`;
     if(c.k==='statut')return`<td>${badgeSt(v)}</td>`;
     if(c.t==='avis_link'){
       const hk=row.no_serie_hk||'';
@@ -3586,7 +3671,7 @@ function rowHtml(row,cols){
   const actions=isE
     ?`<td class="td-actions"><button class="row-btn save-btn" onclick="saveRow('${row.id}')">✓ Enr.</button><button class="row-btn cancel-btn" onclick="cancelEdit()">✕</button></td>`
     :isPseudo
-    ?`<td class="td-actions"><span style="font-size:.72rem;color:var(--slate);padding:0 4px">Avis</span></td>`
+    ?`<td class="td-actions"><button class="row-btn" onclick="openAvisPopupById('${row.id.replace(/'/g,"\\'")}',event)" style="background:var(--blue-pale);border:1px solid var(--blue);color:var(--blue);font-size:.7rem;padding:3px 7px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;gap:3px"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Avis</button></td>`
     :`<td class="td-actions"><button class="row-btn edit-btn" onclick="startEdit('${row.id}')">✎</button>${isAdmin?`<button class="row-btn del-btn" onclick="deleteRow('${row.id}')">🗑</button>`:''}</td>`;
   return`<tr id="row-${row.id}"${isE?' class="editing-row"':''}${selectedRows.has(row.id)?' style="background:#fff3cd"':''}>${chkCell}${actions}${cells}</tr>`;
 }
