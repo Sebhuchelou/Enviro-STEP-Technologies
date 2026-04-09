@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.16 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.17 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -699,6 +699,101 @@ tbody tr:hover{background:#f8fbf5;}
 <div class="toast" id="toast"></div>
 
 <script>
+
+// ════════════════════════════════════════════════════════
+// JOURNAL PLATEFORME
+// ════════════════════════════════════════════════════════
+async function logJournal(section, action, avant, apres){
+  try{
+    if(!session) return;
+    await FB.addDoc(FB.collection(FB.db,'PlatformJournal'),{
+      date_heure: FB.serverTimestamp(),
+      utilisateur: session.email||((session.prenom||'')+' '+(session.nom||'')).trim()||'?',
+      role: session.role||'',
+      section: section,
+      action: action,
+      avant: avant||'',
+      apres: apres||'',
+      createdAt: FB.serverTimestamp()
+    });
+  }catch(e){ console.warn('logJournal error:',e.message); }
+}
+
+async function renderJournalAdmin(){
+  currentPanel='journal';
+  const main=document.getElementById('app-main');
+  main.innerHTML=`<div class="table-spinner"><div class="sp2"></div>Chargement du journal…</div>`;
+  try{
+    const snap=await FB.getDocs(FB.collection(FB.db,'PlatformJournal'));
+    const rows=[];
+    snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+    rows.sort((a,b)=>(b.date_heure?.seconds||0)-(a.date_heure?.seconds||0));
+    const tRows=rows.length?rows.map((r,i)=>{
+      const dateStr=r.date_heure?new Date(r.date_heure.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      const actionColor={'Création':'#16a34a','Modification':'#b45309','Suppression':'#dc2626','Utilisation':'#7c3aed'}[r.action]||'#4a5568';
+      return`<tr style="background:${i%2?'#f7f9fb':'#fff'}">
+        <td style="padding:7px 12px;font-size:.76rem;white-space:nowrap;color:var(--slate)">${dateStr}</td>
+        <td style="padding:7px 12px;font-size:.76rem;font-weight:600">${esc(r.utilisateur||'—')}</td>
+        <td style="padding:7px 12px;font-size:.76rem">${esc(r.role||'—')}</td>
+        <td style="padding:7px 12px;font-size:.76rem;font-weight:600">${esc(r.section||'—')}</td>
+        <td style="padding:7px 12px;text-align:center"><span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:${actionColor}18;color:${actionColor}">${esc(r.action||'—')}</span></td>
+        <td style="padding:7px 12px;font-size:.72rem;color:var(--slate);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.avant||'')}">${esc(r.avant||'—')}</td>
+        <td style="padding:7px 12px;font-size:.72rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.apres||'')}">${esc(r.apres||'—')}</td>
+      </tr>`;
+    }).join('')
+    :`<tr><td colspan="7"><div class="empty-state"><p>Aucune entrée dans le journal</p></div></td></tr>`;
+    main.innerHTML=`
+      <div class="page-header">
+        <div><div class="page-title">📜 Journal de la plateforme</div>
+        <div class="page-sub">${rows.length} entrée${rows.length!==1?'s':''}</div></div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" onclick="switchPanel('accueil',null)">← Retour</button>
+          <button class="btn btn-blue" onclick="exportJournalXLSX()" style="background:#217346;border-color:#217346">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 13l-2-3-2 3H7l3-4.5L7 7h2l2 3 2-3h2l-3 4.5L16 15h-3zm2-8V3.5L18.5 9H15z"/></svg>Exporter XLSX
+          </button>
+        </div>
+      </div>
+      <div class="tbl-card"><div class="tbl-scroll"><table>
+        <thead><tr style="background:var(--charcoal)">
+          <th style="color:#fff;padding:9px 12px">Date et heure</th>
+          <th style="color:#fff;padding:9px 12px">Utilisateur</th>
+          <th style="color:#fff;padding:9px 12px">Rôle</th>
+          <th style="color:#fff;padding:9px 12px">Section</th>
+          <th style="color:#fff;padding:9px 12px;text-align:center">Action</th>
+          <th style="color:#fff;padding:9px 12px">Donnée avant</th>
+          <th style="color:#fff;padding:9px 12px">Donnée après</th>
+        </tr></thead>
+        <tbody>${tRows}</tbody>
+      </table></div></div>`;
+    window._journalRows=rows;
+  }catch(e){
+    main.innerHTML=`<div style="padding:40px;color:var(--err)">Erreur: ${esc(e.message)}</div>`;
+  }
+}
+
+function exportJournalXLSX(){
+  const rows=window._journalRows||[];
+  if(!rows.length){toast('Aucune donnée','err');return;}
+  loadXLSX(()=>{
+    const headers=['Date et heure','Utilisateur','Rôle','Section','Action','Avant','Après'];
+    const data=rows.map(r=>[
+      r.date_heure?new Date(r.date_heure.seconds*1000).toLocaleDateString('fr-CA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',
+      r.utilisateur||'',r.role||'',r.section||'',r.action||'',r.avant||'',r.apres||''
+    ]);
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
+    ws['!cols']=[{wch:22},{wch:24},{wch:14},{wch:20},{wch:14},{wch:40},{wch:40}];
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    for(let C=range.s.c;C<=range.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:0,c:C});
+      if(ws[addr])ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1E2530'}},alignment:{horizontal:'center'}};
+    }
+    XLSX.utils.book_append_sheet(wb,ws,'Journal');
+    XLSX.writeFile(wb,'Journal_Plateforme_'+nowStr()+'.xlsx');
+    toast('Export XLSX téléchargé ✓');
+  });
+}
+
 // ════════════════════════════════════════════════════════
 // WAIT FOR FIREBASE
 // ════════════════════════════════════════════════════════
@@ -982,6 +1077,9 @@ function setupApp(){
       </button>
       <button class="nav-link" onclick="switchPanel('commentaires',this)">
         <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>Commentaires
+      </button>
+      <button class="nav-link" onclick="switchPanel('journal',this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 11H8v-2h5v2zm3-4H8V7h8v2z"/></svg>Journal
       </button>`;
   } else if(session.role==='comptabilite'){
     navLinks.innerHTML=`<button class="nav-link active" onclick="switchPanel('comptabilite',this)">
@@ -1103,6 +1201,7 @@ function renderPanel(){
   else if(currentPanel==='comptabilite')renderComptabilite();
   else if(currentPanel==='accueil')renderAccueilAdmin();
   else if(currentPanel==='commentaires')renderCommentaires();
+  else if(currentPanel==='journal')renderJournalAdmin();
   else renderUsers();
 }
 
@@ -1331,6 +1430,7 @@ async function confirmUtiliserHp(userId, hpId, compagnie, hpRestants){
       date_creation:FB.serverTimestamp()
     });
     document.getElementById('attr-overlay').style.display='none';
+    await logJournal('Hydro-Prime','Utilisation','Entreprise: '+co+' — Avant: '+utilActuel+' HP utilisés','Facture '+facture+' — '+qte+' HP utilisés — Restants: '+newRest);
     toast(qte+' HP utilisés — Facture '+facture+' ✓');
   }catch(e){toast('Erreur: '+e.message,'err');}
   setSyncing(false);
@@ -1520,6 +1620,16 @@ function renderAccueilAdmin(){
     if(r.statut==='Fabriqué')byAsm[asm].fab++;
     else byAsm[asm].avis++;
   });
+
+  // Inventaire par distributeur
+  const livresDist=allRecords.filter(r=>r.statut==='Livré vers distributeur'&&r.nom_distributeur);
+  const byDist={};
+  livresDist.forEach(r=>{
+    const dist=r.nom_distributeur||'';
+    if(!dist)return;
+    if(!byDist[dist])byDist[dist]={livres:0};
+    byDist[dist].livres++;
+  });
   const asmRows=Object.entries(byAsm).sort((a,b)=>a[0].localeCompare(b[0])).map(([asm,counts])=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--mist)">
       <span style="font-size:.82rem;font-weight:600;color:var(--charcoal)">${esc(asm)}</span>
@@ -1579,6 +1689,34 @@ function renderAccueilAdmin(){
               </div>`)
             .join('')
             : '<div style="padding:20px;color:rgba(255,255,255,.4);font-size:.82rem;grid-column:1/-1">Aucun enregistrement actif</div>'
+          }
+        </div>
+      </div>
+
+      <!-- Carte : Inventaire par distributeur -->
+      <div style="grid-column:1/-1;background:linear-gradient(135deg,#154d8c 0%,#1b5fa8 100%);border-radius:12px;box-shadow:0 4px 24px rgba(21,77,140,.18);padding:0;overflow:hidden">
+        <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.8rem">🚚</span>
+            <div>
+              <div style="font-family:var(--cond);font-size:1.05rem;font-weight:800;color:#fff">Inventaire par distributeur</div>
+              <div style="font-size:.73rem;color:rgba(255,255,255,.5);margin-top:2px">Systèmes livrés vers distributeur — cliquer pour filtrer</div>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-family:var(--cond);font-size:1.6rem;font-weight:800;color:#60a5fa">${livresDist.length}</div>
+            <div style="font-size:.65rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px">Livrés dist.</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:rgba(255,255,255,.06);max-height:160px;overflow-y:auto">
+          ${Object.entries(byDist).length
+            ? Object.entries(byDist).sort((a,b)=>a[0].localeCompare(b[0])).map(([dist,counts])=>`
+              <div onclick="filterTableauByDist('${dist.replace(/'/g,"\\'")}' )" style="background:#154d8c;padding:12px 16px;cursor:pointer;transition:background .15s;display:flex;flex-direction:column;gap:6px" onmouseover="this.style.background='#1b5fa8'" onmouseout="this.style.background='#154d8c'">
+                <div style="font-family:var(--cond);font-size:.83rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(dist)}">${esc(dist)}</div>
+                <span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);width:fit-content">🚚 ${counts.livres} Livré${counts.livres>1?'s':''}</span>
+              </div>`)
+            .join('')
+            : '<div style="padding:20px;color:rgba(255,255,255,.4);font-size:.82rem;grid-column:1/-1">Aucune livraison vers distributeur</div>'
           }
         </div>
       </div>
@@ -1646,6 +1784,16 @@ function renderAccueilAdmin(){
           </div>
         </div>
       </div>
+
+      <!-- Carte : Journal de la plateforme -->
+      <div style="background:#fff;border-radius:10px;border-left:5px solid #1e2530;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onclick="switchPanel('journal',null)" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
+        <div style="font-size:2.2rem;flex-shrink:0">📜</div>
+        <div>
+          <div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:var(--charcoal)">Journal de la plateforme</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:4px">Toutes les créations, modifications et suppressions</div>
+        </div>
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
     </div>`;
 }
 
@@ -1653,6 +1801,14 @@ function renderAccueilAdmin(){
 function filterTableauByAsm(asmName){
   fAsm = asmName;
   fSt = 'Fabriqué';
+  asmView = null;
+  switchPanel('tableau', null);
+}
+
+// Filtre le tableau de suivi par distributeur depuis la carte inventaire
+function filterTableauByDist(distName){
+  fDist = distName;
+  fSt = 'Livré vers distributeur';
   asmView = null;
   switchPanel('tableau', null);
 }
@@ -1788,6 +1944,13 @@ async function confirmBulkAdd(){
     const qty=parseInt(document.getElementById('bulk-qty-'+i)?.value||0);
     for(let j=0;j<qty;j++){
       const hk=document.getElementById(`bulk-ser-${i}-${j}`)?.value.trim()||('HK-'+Date.now()+'-'+Math.floor(Math.random()*9000+1000));
+      // Vérif doublon : no_serie_hk + produit_principal
+      const dupKey=hk+'::'+p;
+      if(hk&&allRecords.some(r=>r.no_serie_hk===hk&&r.produit_principal===p)){
+        toast('⚠ Doublon détecté : '+hk+' / '+p+' existe déjà','err');
+        setSyncing(false);
+        return;
+      }
       lines.push({produit_principal:p,no_serie_hk:hk});
     }
   });
@@ -1813,6 +1976,7 @@ async function confirmBulkAdd(){
       ok++;
     }
     document.getElementById('attr-overlay').style.display='none';
+    await logJournal('Tableau de suivi','Création','Ajout en lot PO: '+poAsm,ok+' ligne(s) créée(s)');
     toast(`✓ ${ok} ligne${ok>1?'s':''} créée${ok>1?'s':''}. PO: ${poAsm}`,'ok',5000);
   }catch(e){toast('Erreur après '+ok+' lignes: '+e.message,'err');}
   setSyncing(false);
@@ -2117,7 +2281,7 @@ async function submitFeedback(){
 }
 
 function renderDashboard(){
-  if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard') { renderTableauFiltered(); return; }
+  if(asmView==='avis'||asmView==='avisWith'||asmView==='stock'||asmView==='livre'||asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'||asmView==='plus_tard') { renderTableauFiltered(); return; }
   if(session.role==='conseiller'){ renderConseillerDashboard(); return; }
 
   const isDist = session.role==='distributeur';
@@ -2222,6 +2386,7 @@ function renderDashboard(){
   const kpiSemaine  = kpiRowsAll.filter(r=>r._date&&r._date>=kpiNow&&r._date<=kpiEndWeek);
   const kpiMois     = kpiRowsAll.filter(r=>r._date&&r._date>=kpiNow&&r._date<=kpiEndMonth);
   const kpiRetard   = kpiRowsAll.filter(r=>r._date&&r._date<kpiNow);
+  const kpiPlusTard = kpiRowsAll.filter(r=>r._date&&r._date>kpiEndMonth);
 
   const avisRows=avisMe.length?avisMe.slice(0,6).map(r=>{
     const label = r.nom_entreprise_install || r.distributeur_hk || ((r.prenom_client||'')+' '+(r.nom_client||'')).trim() || '—';
@@ -2251,22 +2416,20 @@ function renderDashboard(){
       </div>
     </div>
 
-    <!-- BANDE KPI -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
-      <div onclick="asmView='semaine';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0891b2;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
-        <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#0891b2">${kpiSemaine.length}</div>
-        <div><div style="font-size:.8rem;font-weight:700;color:var(--charcoal)">À livrer cette semaine</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">date_livraison ou dist ≤ fin de semaine</div></div>
+    <!-- BANDE KPI : Retard → Semaine → Mois → Plus tard -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <div onclick="asmView='retard';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #dc2626;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:#dc2626;flex-shrink:0"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+        <div><div style="font-family:var(--cond);font-size:1.9rem;font-weight:800;color:#dc2626">${kpiRetard.length}</div><div style="font-size:.78rem;font-weight:700;color:#dc2626">En retard</div></div>
       </div>
-      <div onclick="asmView='mois_kpi';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0e7490;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
-        <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#0e7490">${kpiMois.length}</div>
-        <div><div style="font-size:.8rem;font-weight:700;color:var(--charcoal)">À livrer ce mois-ci</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">date_livraison ou dist ≤ fin du mois</div></div>
+      <div onclick="asmView='semaine';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0891b2;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div><div style="font-family:var(--cond);font-size:1.9rem;font-weight:800;color:#0891b2">${kpiSemaine.length}</div><div style="font-size:.78rem;font-weight:700;color:var(--charcoal)">Cette semaine</div></div>
       </div>
-      <div onclick="asmView='retard';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #dc2626;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
-        <div style="display:flex;align-items:center;gap:8px">
-          <svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:#dc2626;flex-shrink:0"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-          <div style="font-family:var(--cond);font-size:2rem;font-weight:800;color:#dc2626">${kpiRetard.length}</div>
-        </div>
-        <div><div style="font-size:.8rem;font-weight:700;color:#dc2626">En retard</div><div style="font-size:.72rem;color:var(--slate);margin-top:2px">Date passée — statut non livré</div></div>
+      <div onclick="asmView='mois_kpi';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #0e7490;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div><div style="font-family:var(--cond);font-size:1.9rem;font-weight:800;color:#0e7490">${kpiMois.length}</div><div style="font-size:.78rem;font-weight:700;color:var(--charcoal)">Ce mois-ci</div></div>
+      </div>
+      <div onclick="asmView='plus_tard';renderDashboard()" style="background:#fff;border-radius:8px;border-left:4px solid #6366f1;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.13)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,.07)'">
+        <div><div style="font-family:var(--cond);font-size:1.9rem;font-weight:800;color:#6366f1">${kpiPlusTard.length}</div><div style="font-size:.78rem;font-weight:700;color:var(--charcoal)">Plus tard</div></div>
       </div>
     </div>
 
@@ -3463,7 +3626,9 @@ async function confirmAttribution(){
     // 1. Mettre à jour AvisInstal
     await FB.updateDoc(FB.doc(FB.db,'AvisInstal',_attrAvisId),{
       no_serie_hk: hk,
-      updatedAt: FB.serverTimestamp()
+      updatedAt: FB.serverTimestamp(),
+      lastModifiedBy: session.email||session.nom||'',
+      lastModifiedAt: FB.serverTimestamp()
     });
 
     // 2. Mettre à jour le record
@@ -3491,6 +3656,7 @@ async function confirmAttribution(){
       await updateHydroPrime(entrepreneur||rec.nom_entrepreneur||'');
     }
 
+    await logJournal('Avis d\'installation','Modification','Attribution N° HK','HK: '+hk+' → '+_attrStatut);
     document.getElementById('attr-overlay').style.display='none';
     _attrAvisId=null; _attrRecordId=null; _attrStatut='';
     toast('Attribution enregistrée — statut : '+_attrStatut+' ✓');
@@ -3510,6 +3676,7 @@ function renderTableauFiltered(){
     semaine:   ['Fabriqué',"Avis d'installation"],
     mois_kpi:  ['Fabriqué',"Avis d'installation"],
     retard:    ['Fabriqué',"Avis d'installation"],
+    plus_tard: ['Fabriqué',"Avis d'installation"],
   };
   const titleMap={
     stock:    asmStockProdFilter ? `📦 Systèmes HK en inventaire — ${asmStockProdFilter}` : '📦 Systèmes HK en inventaire',
@@ -3518,8 +3685,9 @@ function renderTableauFiltered(){
     semaine:  '📅 À livrer cette semaine',
     mois_kpi: '📆 À livrer ce mois-ci',
     retard:   '⚠ Livraisons en retard',
+    plus_tard:'📅 À livrer plus tard (après ce mois-ci)',
   };
-  const colorMap={stock:'var(--green)',avis:'var(--blue)',livre:'#7c3aed',semaine:'#0891b2',mois_kpi:'#0e7490',retard:'#dc2626'};
+  const colorMap={stock:'var(--green)',avis:'var(--blue)',livre:'#7c3aed',semaine:'#0891b2',mois_kpi:'#0e7490',retard:'#dc2626',plus_tard:'#6366f1'};
   const statuts=statutMap[asmView]||[];
   const allRowsForView=getRows().filter(r=>statuts.includes(r.statut));
 
@@ -3554,7 +3722,7 @@ function renderTableauFiltered(){
     rows=rows.filter(r=>r.statut==='Fabriqué' && !r._fromAvis && (!r.no_serie_hk||!hkLivres.has(r.no_serie_hk)));
     if(asmStockProdFilter) rows=rows.filter(r=>(r.produit_principal||'')===asmStockProdFilter);
   }
-  if(asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'){
+  if(asmView==='semaine'||asmView==='mois_kpi'||asmView==='retard'||asmView==='plus_tard'){
     const now=new Date(); now.setHours(0,0,0,0);
     const endOfWeek=new Date(now); endOfWeek.setDate(now.getDate()+(6-now.getDay()));
     const endOfMonth=new Date(now.getFullYear(),now.getMonth()+1,0);
@@ -3607,6 +3775,10 @@ function renderTableauFiltered(){
       const recRows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d<now;});
       const avisRows=avisNoHkView.filter(a=>{const d=pd2(a.date_installation);return d&&d<now;}).map(avisToRecord);
       rows=[...recRows,...avisRows];
+    } else if(asmView==='plus_tard'){
+      const recRows=allRowsForView.filter(r=>{const d=livDate(r);return d&&d>endOfMonth;});
+      const avisRows=avisNoHkView.filter(a=>{const d=pd2(a.date_installation);return d&&d>endOfMonth;}).map(avisToRecord);
+      rows=[...recRows,...avisRows];
     }
   }
   const allCols=getCols();
@@ -3631,6 +3803,11 @@ function renderTableauFiltered(){
     const hkDispo = !isDist ? getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort() : [];
 
     // Pour assembleur : colonne attribution + toutes colonnes | Pour distributeur : lecture seule toutes colonnes
+    // Marquer en rouge les avis modifiés récemment (< 48h)
+    function isAvisRecent(r){
+      const ts=r.lastModifiedAt?.seconds||r.updatedAt?.seconds||0;
+      return ts&&(Date.now()/1000-ts)<172800; // 48h
+    }
     const thAvis = (!isDist ? `<th style="min-width:180px;background:#b45309;color:#fff">Attribuer N° HK</th>` : '')
       + AI_COLS.map(c=>`<th>${esc(c.l)}</th>`).join('');
 
@@ -3697,7 +3874,8 @@ function renderTableauFiltered(){
         if(c.k==='no_serie_hk')return`<td class="hk">${esc(v||'—')}</td>`;
         return`<td>${esc(v||'—')}</td>`;
       }).join('');
-      return`<tr>${cells}</tr>`;
+      const rowBg=isAvisRecent(r)?'background:#fff0f0':'';
+      return`<tr style="${rowBg}">${cells}</tr>`;
     }).join('')
     :`<tr><td colspan="${AI_COLS.length}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun avis avec N° HK</p></div></td></tr>`;
 
@@ -4173,9 +4351,14 @@ function cancelEdit(){editingId=null;editBuf={};if(asmView) renderTableauFiltere
 async function saveRow(id){
   // Doublon HK check
   const newHK=(editBuf.no_serie_hk||'').trim();
+  const newProd=(editBuf.produit_principal||'').trim();
   if(newHK){
     const dup=allRecords.find(r=>r.id!==id && r.no_serie_hk===newHK);
     if(dup){toast('⚠ Ce N° de série HK existe déjà','err');return}
+  }
+  if(newHK&&newProd){
+    const dupComb=allRecords.find(r=>r.id!==id && r.no_serie_hk===newHK && r.produit_principal===newProd);
+    if(dupComb){toast('⚠ Combinaison N° HK + Produit déjà existante','err');return}
   }
   setSyncing(true);
   try{
@@ -4199,6 +4382,7 @@ async function saveRow(id){
       await updateHydroPrime(data.nom_entrepreneur||oldRow.nom_entrepreneur||'');
     }
 
+    await logJournal('Tableau de suivi','Modification','N° HK: '+(oldRow?.no_serie_hk||id),'Statut: '+(data.statut||''));
     editingId=null;editBuf={};
     toast('Enregistré avec succès ✓');
   }catch(e){toast('Erreur: '+e.message,'err')}
@@ -4243,6 +4427,7 @@ async function deleteRow(id){
   confirm2(`Supprimer la ligne N° HK : ${row?row.no_serie_hk:'?'} ?\nCette action est irréversible dans Firebase.`,async()=>{
     setSyncing(true);
     try{
+      await logJournal('Tableau de suivi','Suppression','N° HK: '+(row?.no_serie_hk||id),'');
       await FB.deleteDoc(FB.doc(FB.db,'records',id));
       toast('Ligne supprimée','warn');
     }catch(e){toast('Erreur: '+e.message,'err')}
@@ -4276,6 +4461,7 @@ async function addRow(){
   try{
     const ref=await FB.addDoc(FB.collection(FB.db,'records'),nr);
     editingId=ref.id;editBuf={...nr,id:ref.id};
+    await logJournal('Tableau de suivi','Création','','N° HK: '+newHK);
     toast('Nouvelle ligne créée');
     setTimeout(()=>{const el=document.getElementById('row-'+ref.id);if(el){el.classList.add('row-new');el.scrollIntoView({behavior:'smooth',block:'start'})}},300);
   }catch(e){toast('Erreur: '+e.message,'err')}
@@ -4886,7 +5072,7 @@ function deleteSelectedAvis(){
 async function saveAvisField(id, key, value){
   setSyncing(true);
   try{
-    const updateData={[key]:value, updatedAt:FB.serverTimestamp()};
+    const updateData={[key]:value, updatedAt:FB.serverTimestamp(), lastModifiedBy:session.email||session.nom||'', lastModifiedAt:FB.serverTimestamp()};
     // Si on change le distributeur_hk, auto-remplir assembleur_attribue avec l'assembleur_defaut du distributeur
     if(key==='distributeur_hk' && value){
       const distUser=(allUsers||[]).find(u=>u.role==='distributeur'&&u.actif!==false&&(u.compagnie||'')===(value||''));
@@ -5843,6 +6029,7 @@ async function saveEntreprise(userId,hpId){
       await FB.addDoc(FB.collection(FB.db,'HydroPrime'),{nom_entreprise:co,ville,telephone:tel,hp_cumules:hpCum,hp_utilises:hpUtil,hp_restants:hpRest,createdAt:FB.serverTimestamp(),updatedAt:FB.serverTimestamp()});
     }
     editingId=null;editBuf={};
+    await logJournal('Utilisateurs','Modification','Entreprise: '+co,'Ville: '+ville+', HP: '+hpUtil+' utilisés');
     toast('Entreprise mise à jour ✓');
   }catch(e){toast('Erreur: '+e.message,'err')}
   setSyncing(false);
@@ -5852,7 +6039,9 @@ function deleteEntreprise(id){
   const u=allUsers.find(x=>x.id===id);if(!u)return;
   confirm2(`Supprimer l'entreprise "${u.compagnie||'?'}" ?\nCette action est irréversible.`,async()=>{
     setSyncing(true);
-    try{await FB.deleteDoc(FB.doc(FB.db,'users',id));toast('Entreprise supprimée','warn');}
+    try{
+      await logJournal('Utilisateurs','Suppression','Entreprise: '+(u.compagnie||'?'),'');
+      await FB.deleteDoc(FB.doc(FB.db,'users',id));toast('Entreprise supprimée','warn');}
     catch(e){toast('Erreur: '+e.message,'err')}
     setSyncing(false);
   });
