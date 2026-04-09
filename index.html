@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.11 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.12 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1015,7 +1015,7 @@ function startListeners(){
     allRecords=[];
     snap.forEach(d=>allRecords.push({id:d.id,...d.data()}));
     if(currentPanel==='tableau') { if(asmView) renderTableauFiltered(); else renderTableau(); }
-    else if(currentPanel==='dashboard') renderDashboard();
+    else if(currentPanel==='dashboard') renderDashboard(); else if(currentPanel==='hydroprime') renderHydroPrimeTable();
     else if(currentPanel==='accueil' && session.role==='administrateur') renderAccueilAdmin();
   }, err=>{ toast('Erreur lecture données: '+err.message,'err'); });
 
@@ -1035,7 +1035,7 @@ function startListeners(){
       window.allAvisInstal=[];
       snap.forEach(d=>window.allAvisInstal.push({id:d.id,...d.data()}));
       if(currentPanel==='avisInstal') renderAvisInstal();
-      if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='dashboard') renderDashboard(); else if(currentPanel==='hydroprime') renderHydroPrimeTable();
       if(currentPanel==='tableau') renderTableau();
     }, err=>toast('Erreur lecture AvisInstal: '+err.message,'err'));
   }
@@ -1053,7 +1053,7 @@ function startListeners(){
     window._unsubHydroPrime = FB.onSnapshot(FB.collection(FB.db,'HydroPrime'), snap=>{
       window.allHydroPrime=[];
       snap.forEach(d=>window.allHydroPrime.push({id:d.id,...d.data()}));
-      if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='dashboard') renderDashboard(); else if(currentPanel==='hydroprime') renderHydroPrimeTable();
       if(currentPanel==='accueil' && session.role==='administrateur') renderAccueilAdmin();
     }, err=>toast('Erreur lecture HydroPrime: '+err.message,'err'));
   }
@@ -1064,7 +1064,7 @@ function startListeners(){
       allUsers=[];
       snap.forEach(d=>allUsers.push({id:d.id,...d.data()}));
       if(currentPanel==='users') renderUsers();
-      if(currentPanel==='dashboard') renderDashboard();
+      if(currentPanel==='dashboard') renderDashboard(); else if(currentPanel==='hydroprime') renderHydroPrimeTable();
       if(currentPanel==='comptabilite') renderComptabilite();
     }, err=>toast('Erreur lecture utilisateurs: '+err.message,'err'));
   }
@@ -1093,6 +1093,7 @@ function switchPanel(name,btn){
 function renderPanel(){
   if(currentPanel==='tableau')renderTableau();
   else if(currentPanel==='dashboard')renderDashboard();
+  else if(currentPanel==='hydroprime')renderHydroPrimeTable();
   else if(currentPanel==='avisInstal')renderAvisInstal();
   else if(currentPanel==='comptabilite')renderComptabilite();
   else if(currentPanel==='accueil')renderAccueilAdmin();
@@ -2806,6 +2807,7 @@ function hpTableRetour(){
 }
 
 function renderHydroPrimeTable(filtre){
+  currentPanel='hydroprime'; // empêche les onSnapshot de re-rendre le dashboard par-dessus
   const allHP=window.allHydroPrime||[];
   const consNom=session.role==='conseiller'?((session.prenom||'')+' '+(session.nom||'')).trim():'';
   // Filtrer par conseiller si rôle conseiller
