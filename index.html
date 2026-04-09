@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.2 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.3 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -949,6 +949,7 @@ function goHome(){
 // APP SETUP + REALTIME LISTENERS
 // ════════════════════════════════════════════════════════
 function setupApp(){
+  loadParams(); // Charger les listes produits depuis Firestore
   const ac={administrateur:'#1e2530',assembleur:'#3a8a12',distributeur:'#154d8c',conseiller:'#6d28d9',comptabilite:'#0f766e'};
   const dc={administrateur:'#1e2530',assembleur:'#4caf1a',distributeur:'#1b5fa8',conseiller:'#7c3aed',comptabilite:'#14b8a6'};
   const init=(session.prenom||'?')[0]+(session.nom||'?')[0];
@@ -1244,12 +1245,33 @@ async function saveComptabiliteRow(userId, hpId){
 function renderAccueilAdmin(){
   currentPanel='accueil';
   const main=document.getElementById('app-main');
+
+  // Stats pour la carte inventaire
+  const fabrique=allRecords.filter(r=>r.statut==='Fabriqué');
+  const avisInstal=allRecords.filter(r=>r.statut==="Avis d'installation");
+  const byAsm={};
+  [...fabrique,...avisInstal].forEach(r=>{
+    const asm=r.nom_assembleur||'—';
+    if(!byAsm[asm])byAsm[asm]={fab:0,avis:0};
+    if(r.statut==='Fabriqué')byAsm[asm].fab++;
+    else byAsm[asm].avis++;
+  });
+  const asmRows=Object.entries(byAsm).sort((a,b)=>a[0].localeCompare(b[0])).map(([asm,counts])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--mist)">
+      <span style="font-size:.82rem;font-weight:600;color:var(--charcoal)">${esc(asm)}</span>
+      <span style="display:flex;gap:6px">
+        <span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:#e8f5e9;color:#1b6b2f">⚙️ ${counts.fab} Fab.</span>
+        <span style="padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;font-family:var(--cond);background:#e0f2fe;color:#0369a1">📋 ${counts.avis} Avis</span>
+      </span>
+    </div>`).join('') || '<div style="padding:10px;color:var(--slate);font-size:.82rem">Aucun enregistrement actif</div>';
+
   const cards=[
     {icon:'📊',title:'Tableau de suivi',sub:'Tous les assemblages HK en temps réel',color:'var(--green)',panel:'tableau'},
     {icon:'📋',title:"Avis d'installation",sub:'Gestion des avis d\'installation',color:'var(--blue)',panel:'avisInstal'},
     {icon:'👥',title:'Utilisateurs',sub:'Gestion des comptes et des rôles',color:'#7c3aed',panel:'users'},
     {icon:'💬',title:'Commentaires',sub:'Retours des utilisateurs Beta Test',color:'#f59e0b',panel:'commentaires'},
   ];
+
   main.innerHTML=`
     <div class="page-header">
       <div>
@@ -1257,22 +1279,266 @@ function renderAccueilAdmin(){
         <div class="page-sub">Enviro-STEP Technologies — Panel d'administration</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:900px">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:1100px">
       ${cards.map(c=>`
-        <div onclick="switchPanel('${c.panel}',null)" style="background:#fff;border-radius:10px;border-left:5px solid ${c.color};box-shadow:0 2px 16px rgba(0,0,0,.08);padding:28px 24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:20px" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
-          <div style="font-size:2.4rem;flex-shrink:0">${c.icon}</div>
+        <div onclick="switchPanel('${c.panel}',null)" style="background:#fff;border-radius:10px;border-left:5px solid ${c.color};box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
+          <div style="font-size:2.2rem;flex-shrink:0">${c.icon}</div>
           <div>
-            <div style="font-family:var(--cond);font-size:1.05rem;font-weight:800;color:var(--charcoal)">${c.title}</div>
-            <div style="font-size:.8rem;color:var(--slate);margin-top:4px">${c.sub}</div>
+            <div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:var(--charcoal)">${c.title}</div>
+            <div style="font-size:.78rem;color:var(--slate);margin-top:4px">${c.sub}</div>
           </div>
-          <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         </div>`).join('')}
+
+      <!-- Carte : Inventaire par assembleur -->
+      <div style="background:#fff;border-radius:10px;border-left:5px solid var(--green);box-shadow:0 2px 16px rgba(0,0,0,.08);padding:0;overflow:hidden">
+        <div style="padding:14px 18px;border-bottom:2px solid var(--mist);display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openInventairePopup()">
+          <span style="font-size:1.6rem">🏭</span>
+          <div>
+            <div style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:var(--charcoal)">Inventaire par assembleur</div>
+            <div style="font-size:.75rem;color:var(--slate)">Fabriqués & Avis en attente — cliquer pour détail</div>
+          </div>
+        </div>
+        <div style="max-height:180px;overflow-y:auto">${asmRows}</div>
+      </div>
+
+      <!-- Carte : Ajout en lot -->
+      <div style="background:#fff;border-radius:10px;border-left:5px solid #0f766e;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onclick="openBulkAddModal()" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
+        <div style="font-size:2.2rem;flex-shrink:0">➕</div>
+        <div>
+          <div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:var(--charcoal)">Ajout en lot</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:4px">Créer une vingtaine de lignes avec le même PO assembleur, PO Norweco et date de réception</div>
+        </div>
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
+
+      <!-- Carte : Paramètres -->
+      <div style="background:#fff;border-radius:10px;border-left:5px solid #6b7280;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:24px;cursor:pointer;transition:box-shadow .2s,transform .15s;display:flex;align-items:center;gap:16px" onclick="openParamsModal()" onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,.16)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 16px rgba(0,0,0,.08)';this.style.transform=''">
+        <div style="font-size:2.2rem;flex-shrink:0">⚙️</div>
+        <div>
+          <div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:var(--charcoal)">Paramètres</div>
+          <div style="font-size:.78rem;color:var(--slate);margin-top:4px">Gérer les listes de produits (Produit Principal, #2, #3)</div>
+        </div>
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </div>
     </div>`;
 }
 
 // ════════════════════════════════════════════════════════
-// COMMENTAIRES ADMIN
+// POPUP INVENTAIRE PAR ASSEMBLEUR
 // ════════════════════════════════════════════════════════
+function openInventairePopup(){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  const fabrique=allRecords.filter(r=>r.statut==='Fabriqué');
+  const avisInstal=allRecords.filter(r=>r.statut==="Avis d'installation");
+  const byAsm={};
+  [...fabrique,...avisInstal].forEach(r=>{
+    const asm=r.nom_assembleur||'—';
+    if(!byAsm[asm])byAsm[asm]={fab:[],avis:[]};
+    if(r.statut==='Fabriqué')byAsm[asm].fab.push(r);
+    else byAsm[asm].avis.push(r);
+  });
+  const rows=Object.entries(byAsm).sort((a,b)=>a[0].localeCompare(b[0])).map(([asm,d])=>{
+    const fabRows=d.fab.map(r=>`<tr style="background:#f0fdf4"><td style="padding:4px 8px;font-size:.78rem;color:#1b6b2f">⚙️ Fabriqué</td><td style="padding:4px 8px;font-size:.78rem">${esc(r.no_serie_hk||'—')}</td><td style="padding:4px 8px;font-size:.78rem">${esc(r.produit_principal||'—')}</td></tr>`).join('');
+    const avisRows=d.avis.map(r=>`<tr style="background:#eff6ff"><td style="padding:4px 8px;font-size:.78rem;color:#0369a1">📋 Avis</td><td style="padding:4px 8px;font-size:.78rem">${esc(r.no_serie_hk||'—')}</td><td style="padding:4px 8px;font-size:.78rem">${esc(r.produit_principal||'—')}</td></tr>`).join('');
+    return`<tr style="background:#f3f4f6"><td colspan="3" style="padding:8px 10px;font-family:var(--cond);font-weight:800;font-size:.85rem;color:var(--charcoal)">🏭 ${esc(asm)} — ${d.fab.length} Fab. / ${d.avis.length} Avis</td></tr>${fabRows}${avisRows}`;
+  }).join('');
+
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid var(--green)">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">🏭 Inventaire par assembleur</div>
+      <div style="font-size:.75rem;color:var(--slate)">Fabriqués & Avis d'installation actifs</div></div>
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--green)">
+          <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#fff">Statut</th>
+          <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#fff">N° Série</th>
+          <th style="padding:7px 10px;text-align:left;font-size:.75rem;color:#fff">Produit</th>
+        </tr></thead>
+        <tbody>${rows||'<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--slate)">Aucun enregistrement actif</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+
+// ════════════════════════════════════════════════════════
+// MODAL AJOUT EN LOT
+// ════════════════════════════════════════════════════════
+function openBulkAddModal(){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  const assembleurs=(allUsers||[]).filter(u=>u.role==='assembleur'&&u.actif!==false).map(u=>u.compagnie||'').filter(Boolean).sort();
+  const asmOpts=assembleurs.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  const prodOpts=`<option value="">—</option>`+window_params.produits_principaux.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid #0f766e">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">➕ Ajout en lot</div>
+      <div style="font-size:.75rem;color:var(--slate)">Même PO Assembleur, PO Norweco et date de réception pour toutes les lignes</div></div>
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">#PO Assembleur *</label>
+          <input id="bulk-po-asm" placeholder="Ex: PO-2024-001" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">#PO Norweco *</label>
+          <input id="bulk-po-nor" placeholder="Ex: NOR-2024-001" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Date réception *</label>
+          <input type="date" id="bulk-date" value="${nowStr()}" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+        <div><label style="font-size:.7rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom assembleur *</label>
+          <select id="bulk-asm" style="width:100%;padding:7px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box">
+            <option value="">— Choisir —</option>${asmOpts}
+          </select></div>
+      </div>
+
+      <div style="border-top:2px dashed var(--mist);padding-top:14px;margin-top:4px">
+        <div style="font-family:var(--cond);font-size:.82rem;font-weight:700;color:var(--charcoal);margin-bottom:10px">Lignes par modèle de produit :</div>
+        <div id="bulk-lines" style="display:flex;flex-direction:column;gap:8px">
+          ${window_params.produits_principaux.map((p,i)=>`
+            <div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:8px;align-items:center">
+              <span style="font-size:.82rem;font-weight:600;color:var(--charcoal)">${esc(p)}</span>
+              <input type="number" id="bulk-qty-${i}" min="0" value="0" placeholder="Qté" style="padding:5px 8px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;width:100%"/>
+              <div id="bulk-serials-${i}" style="display:none;flex-direction:column;gap:4px"></div>
+            </div>`).join('')}
+        </div>
+        <button onclick="generateBulkSerialFields()" style="margin-top:10px;padding:6px 14px;border-radius:var(--r);border:2px solid #0f766e;background:transparent;color:#0f766e;font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">🔢 Générer les champs N° de série</button>
+      </div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+      <button onclick="confirmBulkAdd()" style="padding:8px 20px;border-radius:var(--r);border:2px solid #0f766e;background:#0f766e;color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">💾 Créer les lignes</button>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+
+function generateBulkSerialFields(){
+  window_params.produits_principaux.forEach((p,i)=>{
+    const qty=parseInt(document.getElementById('bulk-qty-'+i)?.value||0);
+    const container=document.getElementById('bulk-serials-'+i);
+    if(!container)return;
+    container.innerHTML='';
+    if(qty<=0){container.style.display='none';return;}
+    container.style.display='flex';
+    for(let j=0;j<qty;j++){
+      const inp=document.createElement('input');
+      inp.type='text';inp.id=`bulk-ser-${i}-${j}`;
+      inp.placeholder=`N° série #${j+1}`;
+      inp.style.cssText='padding:5px 8px;border:1px solid var(--mist);border-radius:4px;font-size:.78rem;width:100%';
+      container.appendChild(inp);
+    }
+  });
+}
+
+async function confirmBulkAdd(){
+  const poAsm=document.getElementById('bulk-po-asm')?.value.trim()||'';
+  const poNor=document.getElementById('bulk-po-nor')?.value.trim()||'';
+  const date=document.getElementById('bulk-date')?.value||'';
+  const asm=document.getElementById('bulk-asm')?.value||'';
+  if(!poAsm||!poNor||!date||!asm){toast('Tous les champs communs sont requis','err');return;}
+  const lines=[];
+  window_params.produits_principaux.forEach((p,i)=>{
+    const qty=parseInt(document.getElementById('bulk-qty-'+i)?.value||0);
+    for(let j=0;j<qty;j++){
+      const hk=document.getElementById(`bulk-ser-${i}-${j}`)?.value.trim()||('HK-'+Date.now()+'-'+Math.floor(Math.random()*9000+1000));
+      lines.push({produit_principal:p,no_serie_hk:hk});
+    }
+  });
+  if(!lines.length){toast('Aucune ligne à créer — indiquez des quantités','err');return;}
+  setSyncing(true);
+  let ok=0;
+  try{
+    for(const l of lines){
+      await FB.addDoc(FB.collection(FB.db,'records'),{
+        po_assembleur:poAsm, po_norweco:poNor, recu_le:date, nom_assembleur:asm,
+        no_serie_hk:l.no_serie_hk, produit_principal:l.produit_principal,
+        produit2:'', produit3:'', conseiller:'',
+        nom_entrepreneur:'', nom_installateur:'',
+        date_livraison:'', type_client:'Entrepreneur direct',
+        nom_distributeur:'', date_livraison_dist:'',
+        adresse_site:'', ville_livraison:'',
+        notes_assembleur:'', notes_distributeur:'',
+        assembleur_dist:asm, identification_site:'',
+        statut:'Fabriqué',
+        derniere_modif:nowStr(), dernier_utilisateur:session.email||'',
+        createdAt:FB.serverTimestamp(), updatedAt:FB.serverTimestamp()
+      });
+      ok++;
+    }
+    document.getElementById('attr-overlay').style.display='none';
+    toast(`✓ ${ok} ligne${ok>1?'s':''} créée${ok>1?'s':''}. PO: ${poAsm}`,'ok',5000);
+  }catch(e){toast('Erreur après '+ok+' lignes: '+e.message,'err');}
+  setSyncing(false);
+}
+
+// ════════════════════════════════════════════════════════
+// MODAL PARAMÈTRES
+// ════════════════════════════════════════════════════════
+function openParamsModal(){
+  const overlay=document.getElementById('attr-overlay');
+  if(!overlay)return;
+  function listHtml(key,label,color){
+    return`<div style="margin-bottom:18px">
+      <div style="font-family:var(--cond);font-weight:800;font-size:.85rem;color:${color};margin-bottom:8px">${label}</div>
+      <div id="params-list-${key}" style="display:flex;flex-direction:column;gap:6px">
+        ${window_params[key].map((p,i)=>`
+          <div style="display:flex;gap:6px;align-items:center">
+            <input value="${esc(p)}" data-key="${key}" data-idx="${i}" onchange="window_params['${key}'][${i}]=this.value" style="flex:1;padding:5px 8px;border:1px solid var(--mist);border-radius:4px;font-size:.82rem"/>
+            <button onclick="removeParam('${key}',${i})" style="padding:4px 8px;border-radius:4px;border:1px solid var(--err);background:transparent;color:var(--err);cursor:pointer;font-size:.75rem;font-weight:700">✕</button>
+          </div>`).join('')}
+      </div>
+      <button onclick="addParam('${key}')" style="margin-top:6px;padding:5px 12px;border-radius:4px;border:2px solid ${color};background:transparent;color:${color};font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">+ Ajouter</button>
+    </div>`;
+  }
+  overlay.innerHTML=`<div style="background:#fff;border-radius:8px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);border-top:4px solid #6b7280">
+    <div style="padding:18px 24px 12px;border-bottom:1px solid var(--mist);display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-family:var(--cond);font-size:1rem;font-weight:800;color:#222">⚙️ Paramètres — Listes produits</div>
+      <div style="font-size:.75rem;color:var(--slate)">Ces listes alimentent tous les dropdowns de l'application</div></div>
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="background:none;border:none;font-size:1.3rem;color:var(--silver);cursor:pointer">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      ${listHtml('produits_principaux','Produit Principal','var(--green)')}
+      ${listHtml('produits_2','Produit #2','var(--blue)')}
+      ${listHtml('produits_3','Produit #3','#7c3aed')}
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid var(--mist);display:flex;justify-content:flex-end;gap:10px">
+      <button onclick="document.getElementById('attr-overlay').style.display='none'" style="padding:8px 18px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">Annuler</button>
+      <button onclick="saveParamsAndClose()" style="padding:8px 20px;border-radius:var(--r);border:2px solid #0f766e;background:#0f766e;color:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer">💾 Enregistrer</button>
+    </div>
+  </div>`;
+  overlay.style.display='flex';
+}
+
+function addParam(key){
+  window_params[key].push('');
+  openParamsModal();
+}
+function removeParam(key,idx){
+  window_params[key].splice(idx,1);
+  openParamsModal();
+}
+async function saveParamsAndClose(){
+  setSyncing(true);
+  try{
+    // Récupérer les valeurs des inputs avant de sauvegarder
+    ['produits_principaux','produits_2','produits_3'].forEach(key=>{
+      document.querySelectorAll(`[data-key="${key}"]`).forEach((inp,i)=>{
+        window_params[key][i]=inp.value.trim();
+      });
+      window_params[key]=window_params[key].filter(v=>v.length>0);
+    });
+    await saveParams();
+    document.getElementById('attr-overlay').style.display='none';
+    toast('Paramètres enregistrés ✓');
+  }catch(e){toast('Erreur: '+e.message,'err');}
+  setSyncing(false);
+}
 function renderCommentaires(){
   currentPanel='commentaires';
   const main=document.getElementById('app-main');
@@ -1578,7 +1844,7 @@ function renderDashboard(){
     :`<div style="color:var(--slate);font-size:.8rem;padding:8px 0">Aucun avis en cours</div>`;
 
   const titlePage        = isDist ? `Mes livraisons — ${esc(session.compagnie||'')}` : `Mes assemblages — ${esc(session.compagnie||'')}`;
-  const cardStock1Title  = isDist ? '📦 Stock disponible' : '🔧 Stock — Fabriqués';
+  const cardStock1Title  = isDist ? '📦 Stock disponible' : '📦 Systèmes HK en inventaire';
   const cardStock1Sub    = isDist ? 'Assemblages fabriqués disponibles' : "Prêts à être livrés (sans avis d'installation attribué)";
   const cardAvisSub      = 'Avec numéro de série HK attribué';
   const cardTraiterTitle = isDist ? '📌 Avis en cours' : "📌 Avis d'installation à traiter";
@@ -2566,10 +2832,16 @@ function openAttrStep2(){
           <div style="display:flex;flex-direction:column;gap:9px">
 
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #2</label>
-              <input id="attr-produit2" value="${esc(avis.produit2||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+              <select id="attr-produit2" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box">
+                <option value="">— Aucun —</option>
+                ${getProdOpts(window_params.produits_2, avis.produit2||'')}
+              </select></div>
 
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Produit #3</label>
-              <input id="attr-produit3" value="${esc(avis.produit3||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
+              <select id="attr-produit3" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box">
+                <option value="">— Aucun —</option>
+                ${getProdOpts(window_params.produits_3, avis.produit3||'')}
+              </select></div>
 
             <div><label style="font-size:.71rem;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.5px">Nom de l'entrepreneur</label>
               <input id="attr-entrepreneur" value="${esc(avis.nom_entreprise_install||avis.nom_entrepreneur||'')}" style="width:100%;padding:6px 10px;border:1px solid var(--mist);border-radius:var(--r);font-size:.83rem;margin-top:3px;box-sizing:border-box"/></div>
@@ -2740,7 +3012,7 @@ function renderTableauFiltered(){
     retard:    ['Fabriqué',"Avis d'installation"],
   };
   const titleMap={
-    stock:    asmStockProdFilter ? `🔧 Stock — ${asmStockProdFilter}` : '🔧 Stock — Assemblages fabriqués',
+    stock:    asmStockProdFilter ? `📦 Systèmes HK en inventaire — ${asmStockProdFilter}` : '📦 Systèmes HK en inventaire',
     avis:     "📋 Associés à un Avis d'installation",
     livre:    '🚚 Livrés',
     semaine:  '📅 À livrer cette semaine',
@@ -2836,13 +3108,24 @@ function renderTableauFiltered(){
   }
   const allCols=getCols();
 
+  // Vue stock assembleur : colonnes limitées
+  const COLS_STOCK_ASM=[
+    {k:'no_serie_hk',     l:'Avis d\'installation', t:'avis_link', ro:true},
+    {k:'po_assembleur',   l:'#PO Assembleur',                      ro:true},
+    {k:'po_norweco',      l:'#PO Norweco',                         ro:true},
+    {k:'nom_assembleur',  l:'Nom de l\'Assembleur',                ro:true},
+    {k:'recu_le',         l:'Date réception assembleur', t:'date', ro:true},
+    {k:'no_serie_hk',     l:'N° Série HK',              hk:true,  ro:true},
+    {k:'produit_principal',l:'Produit Principal',                  ro:true},
+  ];
+
   // VUE "Avis d'installation à traiter/en cours" — AvisInstal sans N° HK
   if(asmView==='avis'){
     const isDist = session.role==='distributeur';
     const allAvis = (window.allAvisInstal||[]).filter(r=>{
       if(isDist) return !r.no_serie_hk && (r.distributeur_hk||'')===(session.compagnie||'');
       return (r.assembleur_attribue||'')===(session.compagnie||'') && !r.no_serie_hk;
-    });
+    }).sort((a,b)=>(a.produit_principal||'').localeCompare(b.produit_principal||''));
     const hkDispo = !isDist ? getRows().filter(r=>r.statut==='Fabriqué').map(r=>r.no_serie_hk).filter(Boolean).sort() : [];
 
     // Pour assembleur : colonne attribution + toutes colonnes | Pour distributeur : lecture seule toutes colonnes
@@ -2940,9 +3223,39 @@ function renderTableauFiltered(){
   }
 
   // Construction des lignes pour stock et livre
+  const isAsmStock = asmView==='stock' && session.role==='assembleur';
+  const viewCols = isAsmStock ? COLS_STOCK_ASM : allCols;
+
+  // Vue stock assembleur : regroupement avis par entreprise
+  let avisGroupHtml = '';
+  if(isAsmStock){
+    const avisNonLivres=(window.allAvisInstal||[]).filter(a=>
+      !a.no_serie_hk && (a.assembleur_attribue||'')===(session.compagnie||'')
+    );
+    if(avisNonLivres.length){
+      // Regrouper par entreprise
+      const byEnt={};
+      avisNonLivres.forEach(a=>{
+        const ent=a.nom_entreprise_install||a.nom_entrepreneur||'—';
+        if(!byEnt[ent])byEnt[ent]=[];
+        byEnt[ent].push(a);
+      });
+      const entRows=Object.entries(byEnt).sort((a,b)=>a[0].localeCompare(b[0])).map(([ent,avis])=>`
+        <tr style="background:#fef3c7">
+          <td colspan="2" style="padding:6px 10px;font-family:var(--cond);font-weight:800;font-size:.82rem;color:#92400e">🏢 ${esc(ent)}</td>
+          <td colspan="5" style="padding:6px 10px;color:#b45309;font-size:.78rem">${avis.map(a=>`${esc(a.produit_principal||'—')} — ${esc(a.ville_site||'—')} (${esc(a.date_installation||'sans date')})`).join(' &nbsp;|&nbsp; ')}</td>
+        </tr>`).join('');
+      avisGroupHtml=`
+        <div style="margin-bottom:12px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;overflow:hidden">
+          <div style="background:#f59e0b;padding:8px 14px;font-family:var(--cond);font-weight:800;font-size:.82rem;color:#fff">📌 Avis non livrés — ${avisNonLivres.length} en attente (regroupés par entreprise)</div>
+          <table style="width:100%;border-collapse:collapse"><tbody>${entRows}</tbody></table>
+        </div>`;
+    }
+  }
+
   const tblRows=rows.length
-    ?rows.map(r=>rowHtml(r,allCols)).join('')
-    :`<tr><td colspan="${allCols.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
+    ?rows.map(r=>rowHtml(r,viewCols)).join('')
+    :`<tr><td colspan="${viewCols.length+1}"><div class="empty-state"><svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><p>Aucun enregistrement</p></div></td></tr>`;
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
@@ -2957,17 +3270,53 @@ function renderTableauFiltered(){
       </div>
     </div>
     <div class="tbl-card">
+      ${avisGroupHtml}
       <div class="tbl-scroll">
         <table>
           <thead><tr>
             <th>Actions</th>
-            ${allCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
+            ${viewCols.map(c=>`<th onclick="doSort('${c.k}')" class="${sortKey===c.k?'s-'+sortDir:''}">${c.l}</th>`).join('')}
           </tr></thead>
           <tbody>${tblRows}</tbody>
         </table>
       </div>
     </div>`;
 }
+// ════════════════════════════════════════════════════════
+// PARAMÈTRES PRODUITS (chargés depuis Firestore ou défauts)
+// ════════════════════════════════════════════════════════
+const PRODUITS_PRINCIPAUX_DEFAUT=['HK-1260-4T','HK-1260-DT','HK-1600-4T','HK-1600-DT','HK-1890-DT','HK-2270-DT','HK-3020-DT','HK-3780-DT'];
+const PRODUITS_2_DEFAUT=['UV HKP-33','(aucune option)'];
+const PRODUITS_3_DEFAUT=['Phos-4-fade','(aucune option)'];
+let window_params = {
+  produits_principaux: [...PRODUITS_PRINCIPAUX_DEFAUT],
+  produits_2:          [...PRODUITS_2_DEFAUT],
+  produits_3:          [...PRODUITS_3_DEFAUT],
+};
+// Charger les params depuis Firestore
+async function loadParams(){
+  try{
+    const snap=await FB.getDoc(FB.doc(FB.db,'params','produits'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(Array.isArray(d.produits_principaux)&&d.produits_principaux.length) window_params.produits_principaux=d.produits_principaux;
+      if(Array.isArray(d.produits_2)&&d.produits_2.length) window_params.produits_2=d.produits_2;
+      if(Array.isArray(d.produits_3)&&d.produits_3.length) window_params.produits_3=d.produits_3;
+    }
+  }catch(e){console.warn('Params non chargés:',e);}
+}
+async function saveParams(){
+  await FB.setDoc(FB.doc(FB.db,'params','produits'),{
+    produits_principaux: window_params.produits_principaux,
+    produits_2:          window_params.produits_2,
+    produits_3:          window_params.produits_3,
+    updatedAt:           FB.serverTimestamp()
+  });
+}
+function getProdOpts(list,current){
+  return list.map(p=>`<option value="${esc(p)}"${p===current?' selected':''}>${esc(p)}</option>`).join('');
+}
+
 const STATUT_OPTS=['Avis d\'installation','Fabriqué','Livré vers distributeur','Livré vers entreprise'];
 const COLS_ADMIN=[
   {k:'no_serie_hk',          l:'Avis d\'installation', t:'avis_link', ro:true},
@@ -2976,10 +3325,10 @@ const COLS_ADMIN=[
   {k:'nom_assembleur',       l:'Nom de l\'Assembleur'},
   {k:'recu_le',              l:'Date réception assembleur',t:'date'},
   {k:'no_serie_hk',          l:'N° Série HK',hk:true},
-  {k:'produit_principal',    l:'Produit Principal'},
-  {k:'produit2',             l:'Produit #2'},
-  {k:'produit3',             l:'Produit #3'},
-  {k:'conseiller',           l:'Conseiller'},
+  {k:'produit_principal',    l:'Produit Principal', t:'prod1'},
+  {k:'produit2',             l:'Produit #2',        t:'prod2'},
+  {k:'produit3',             l:'Produit #3',        t:'prod3'},
+  {k:'conseiller',           l:'Conseiller',        t:'cons'},
   {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
   {k:'nom_installateur',     l:'Installateur autorisé'},
   {k:'hydro_prime_cumules',  l:'Hydro-Primes cumulés',  t:'num'},
@@ -3007,9 +3356,9 @@ const COLS_ASM=[
   {k:'recu_le',              l:'Date réception assembleur', t:'date', ro:true},
   {k:'no_serie_hk',          l:'N° Série HK', hk:true, ro:true},
   {k:'produit_principal',    l:'Produit Principal', ro:true},
-  {k:'produit2',             l:'Produit #2'},
-  {k:'produit3',             l:'Produit #3'},
-  {k:'conseiller',           l:'Conseiller', ro:true},
+  {k:'produit2',             l:'Produit #2',        t:'prod2'},
+  {k:'produit3',             l:'Produit #3',        t:'prod3'},
+  {k:'conseiller',           l:'Conseiller',        t:'cons', ro:true},
   {k:'nom_entrepreneur',     l:'Nom de l\'entrepreneur'},
   {k:'nom_installateur',     l:'Installateur autorisé', ro:true},
   {k:'date_livraison',       l:'Date livraison assembleur', t:'date'},
@@ -3028,9 +3377,9 @@ const COLS_DIST=[
   {k:'nom_assembleur',       l:'Nom de l\'Assembleur',                       ro:true},
   {k:'no_serie_hk',          l:'N° Série HK',                               hk:true, ro:true},
   {k:'produit_principal',    l:'Produit Principal',                          ro:true},
-  {k:'produit2',             l:'Produit #2'},
-  {k:'produit3',             l:'Produit #3'},
-  {k:'conseiller',           l:'Conseiller',                                 ro:true},
+  {k:'produit2',             l:'Produit #2',        t:'prod2'},
+  {k:'produit3',             l:'Produit #3',        t:'prod3'},
+  {k:'conseiller',           l:'Conseiller',        t:'cons',                ro:true},
   {k:'nom_entrepreneur',     l:"Nom de l'entrepreneur"},
   {k:'nom_installateur',     l:'Installateur autorisé',                      ro:true},
   {k:'date_livraison',       l:'Date livraison assembleur',    t:'date',     ro:true},
@@ -3051,9 +3400,9 @@ const COLS_CONS=[
   {k:'recu_le',              l:'Date réception assembleur',          t:'date',                 ro:true},
   {k:'no_serie_hk',          l:'N° Série HK',                        hk:true,                 ro:true},
   {k:'produit_principal',    l:'Produit Principal',                                            ro:true},
-  {k:'produit2',             l:'Produit #2',                                                   ro:true},
-  {k:'produit3',             l:'Produit #3',                                                   ro:true},
-  {k:'conseiller',           l:'Conseiller'},
+  {k:'produit2',             l:'Produit #2',        t:'prod2',                                 ro:true},
+  {k:'produit3',             l:'Produit #3',        t:'prod3',                                 ro:true},
+  {k:'conseiller',           l:'Conseiller',        t:'cons'},
   {k:'nom_entrepreneur',     l:"Nom de l'entrepreneur"},
   {k:'nom_installateur',     l:'Installateur autorisé'},
   {k:'date_livraison',       l:'Date livraison assembleur',          t:'date',                 ro:true},
@@ -3208,6 +3557,14 @@ function rowHtml(row,cols){
     if(isE){
       if(c.ro) return`<td>${esc(v)||'—'}</td>`; // lecture seule
       if(c.t==='sel'){const o=c.opts.map(x=>`<option value="${esc(x)}"${v===x?' selected':''}>${esc(x)}</option>`).join('');return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='prod1'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_principaux,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='prod2'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_2,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='prod3'){const o=`<option value="">—</option>`+getProdOpts(window_params.produits_3,v);return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`}
+      if(c.t==='cons'){
+        const conseillers=(allUsers||[]).filter(u=>u.role==='conseiller'&&u.actif!==false).map(u=>((u.prenom||'')+' '+(u.nom||'')).trim()).filter(Boolean).sort();
+        const o=`<option value="">—</option>`+conseillers.map(n=>`<option value="${esc(n)}"${v===n?' selected':''}>${esc(n)}</option>`).join('');
+        return`<td><select onchange="editBuf['${c.k}']=this.value">${o}</select></td>`;
+      }
       if(c.t==='date')return`<td><input type="date" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value"/></td>`;
       if(c.t==='num')return`<td><input type="number" step="0.01" value="${esc(v)}" oninput="editBuf['${c.k}']=this.value" style="width:90px"/></td>`;
       if(c.k==='dernier_utilisateur'||c.k==='derniere_modif')return`<td>${esc(v)||'—'}</td>`;
@@ -3215,7 +3572,6 @@ function rowHtml(row,cols){
     }
     if(c.k==='statut')return`<td>${badgeSt(v)}</td>`;
     if(c.t==='avis_link'){
-      // Chercher l'avis associé par no_serie_hk
       const hk=row.no_serie_hk||'';
       const avis=(window.allAvisInstal||[]).find(a=>a.no_serie_hk===hk);
       if(!hk||!avis) return`<td style="text-align:center;color:var(--silver)">—</td>`;
@@ -3612,6 +3968,7 @@ function buildImportPreview(headers,rows){
   const colMap=headers.map(h=>IMPORT_MAP[h.toLowerCase().trim()]||null);
   const hkIdx=colMap.indexOf('no_serie_hk');
   if(hkIdx===-1){toast('Colonne "Numéro de série HK" introuvable','err');return}
+  const prod1Idx=colMap.indexOf('produit_principal');
   rows.forEach((row,i)=>{
     if(row.every(c=>!String(c).trim()))return;
     const hk=String(row[hkIdx]||'').trim();
@@ -3621,9 +3978,40 @@ function buildImportPreview(headers,rows){
     const inDB=allRecords.find(r=>r.no_serie_hk===hk);
     const record={_isUpdate:!!inDB,_dbId:inDB?inDB.id:null};
     colMap.forEach((key,ci)=>{if(key)record[key]=String(row[ci]||'').trim()});
+    // Valider le produit_principal
+    if(prod1Idx!==-1){
+      const pp=record.produit_principal||'';
+      if(pp && !window_params.produits_principaux.includes(pp)){
+        record._prodWarn=true;
+        logs.push(`⚠ Ligne ${i+2} : Produit "${esc(pp)}" non reconnu — correction requise`);
+      }
+    }
     if(inDB)logs.push(`🔄 Ligne ${i+2} : "${hk}" existe — sera mis à jour`);
     importParsed.push(record);
   });
+  // Afficher panneau de correction si des produits invalides
+  const warnLines=importParsed.filter(r=>r._prodWarn);
+  if(warnLines.length){
+    const corrHtml=warnLines.map((r,wi)=>{
+      const opts=`<option value="">— Garder "${esc(r.produit_principal)}" —</option>`+window_params.produits_principaux.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+      return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--mist)">
+        <span style="font-size:.78rem;color:var(--charcoal);flex:1">${esc(r.no_serie_hk)} — <span style="color:var(--err)">${esc(r.produit_principal)}</span></span>
+        <select data-wiidx="${wi}" style="padding:4px 8px;border-radius:4px;border:1px solid var(--err);font-size:.78rem;background:#fef2f2">
+          ${opts}
+        </select>
+      </div>`;
+    }).join('');
+    const warnBox=document.createElement('div');
+    warnBox.id='import-prod-warn';
+    warnBox.style.cssText='background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:12px 14px;margin-top:10px';
+    warnBox.innerHTML=`<div style="font-family:var(--cond);font-weight:800;font-size:.82rem;color:var(--err);margin-bottom:8px">⚠ ${warnLines.length} produit${warnLines.length>1?'s':''} non reconnu${warnLines.length>1?'s':''} — corrigez avant d'importer</div>${corrHtml}
+    <button onclick="applyImportProdCorrections()" style="margin-top:8px;padding:5px 12px;border-radius:4px;border:2px solid var(--green);background:transparent;color:var(--green);font-family:var(--cond);font-size:11px;font-weight:700;cursor:pointer">✓ Appliquer les corrections</button>`;
+    const area=document.getElementById('import-preview-area');
+    const existing=document.getElementById('import-prod-warn');
+    if(existing)existing.remove();
+    if(area)area.parentNode.insertBefore(warnBox,area);
+  }
+  window._importWarnLines=warnLines;
   const newC=importParsed.filter(r=>!r._isUpdate).length;
   const updC=importParsed.filter(r=>r._isUpdate).length;
   document.getElementById('import-stats').innerHTML=
@@ -3653,7 +4041,7 @@ async function confirmImport(){
   let added=0,updated=0,errors=0;
   for(const r of importParsed){
     const rec={...r};
-    delete rec._isUpdate;delete rec._dbId;
+    delete rec._isUpdate;delete rec._dbId;delete rec._prodWarn;
     rec.derniere_modif=nowStr();rec.dernier_utilisateur=session.email||session.nom||'';
     rec.updatedAt=FB.serverTimestamp();
     try{
@@ -3669,6 +4057,20 @@ async function confirmImport(){
   setSyncing(false);
   btn.disabled=false;
   toast(`Import terminé — ${added} ajout${added!==1?'s':''}, ${updated} màj${errors?', '+errors+' erreur(s)':''}`);
+}
+
+function applyImportProdCorrections(){
+  const warnLines=window._importWarnLines||[];
+  document.querySelectorAll('#import-prod-warn select').forEach((sel,wi)=>{
+    const newVal=sel.value;
+    if(newVal&&warnLines[wi]){
+      const rec=importParsed.find(r=>r.no_serie_hk===warnLines[wi].no_serie_hk);
+      if(rec){rec.produit_principal=newVal;delete rec._prodWarn;}
+    }
+  });
+  const box=document.getElementById('import-prod-warn');
+  if(box){box.style.background='#f0fdf4';box.innerHTML=`<div style="color:var(--green);font-family:var(--cond);font-weight:700;font-size:.82rem">✓ Corrections appliquées</div>`;}
+  toast('Corrections produits appliquées ✓');
 }
 
 // ════════════════════════════════════════════════════════
