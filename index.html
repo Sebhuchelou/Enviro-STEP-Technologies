@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.12 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.13 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -2868,14 +2868,9 @@ function renderHydroPrimeTable(filtre){
 
   document.getElementById('app-main').innerHTML=`
     <div class="page-header">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="hpTableRetour()" style="padding:7px 14px;border-radius:var(--r);border:2px solid var(--mist);background:#fff;font-family:var(--cond);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
-          <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>Retour
-        </button>
-        <div>
-          <div class="page-title">💰 Tableau Hydro-Prime${titreFiltre}</div>
-          <div class="page-sub" style="color:#b45309">${sorted.length} entreprise${sorted.length!==1?'s':''}</div>
-        </div>
+      <div>
+        <div class="page-title">💰 Tableau Hydro-Prime${titreFiltre}</div>
+        <div class="page-sub" style="color:#b45309">${sorted.length} entreprise${sorted.length!==1?'s':''}</div>
       </div>
     </div>
     <div class="tbl-card">
