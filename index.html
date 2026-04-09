@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.15 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.16 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -2372,13 +2372,16 @@ function renderConseillerDashboard(){
 
   const allAvis  = window.allAvisInstal||[];
   const allU     = allUsers||[];
+
+  // consNom doit être défini AVANT allHP qui l'utilise dans son filtre
+  const consNom = ((session.prenom||'')+' '+(session.nom||'')).trim();
+
   const allHP    = (window.allHydroPrime||[]).filter(h=>{
     const ent=allU.find(u=>u.role==='entreprise'&&(u.compagnie||'')===(h.nom_entreprise||''));
     return !ent || (ent.conseiller_attribue||'')===(consNom||'');
   });
 
   // Avis du conseiller (conseiller_regional === prénom + nom du conseiller)
-  const consNom = ((session.prenom||'')+' '+(session.nom||'')).trim();
   const myAvis = allAvis.filter(r=>(r.conseiller_regional||'')===(consNom||''));
 
   function avisDate(r){ const d=r.createdAt?.toDate?r.createdAt.toDate():(r.createdAt?new Date(r.createdAt):null); return d&&!isNaN(d)?d:null; }
