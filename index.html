@@ -592,7 +592,7 @@ tbody tr:hover{background:#f8fbf5;}
       </div>
 
       <div class="home-footer-bar">
-        <span>Plateforme de suivi HK - version beta 1.6 - Développée par SHU</span>
+        <span>Plateforme de suivi HK - version beta 1.7 - Développée par SHU</span>
         <span id="home-date"></span>
       </div>
     </div>
@@ -1279,6 +1279,13 @@ function hpUtilPreview(utilActuel, hpRestants){
   if(el2)el2.textContent=Math.max(0,hpRestants-q);
 }
 
+// Variante pour le tableau HP conseiller : on part du doc HydroPrime (pas du userId)
+function openUtiliserHpModalFromHP(hpId, compagnie, hpRestants){
+  const u=(allUsers||[]).find(x=>x.role==='entreprise'&&(x.compagnie||'')===(compagnie||''));
+  const userId=u?u.id:('_hp_'+hpId);
+  openUtiliserHpModal(userId, hpId, compagnie, hpRestants);
+}
+
 async function confirmUtiliserHp(userId, hpId, compagnie, hpRestants){
   const qte=parseInt(document.getElementById('hp-util-qte')?.value||'0')||0;
   const facture=(document.getElementById('hp-util-facture')?.value||'').trim();
@@ -1334,11 +1341,12 @@ async function openJournalHpModal(hpId, compagnie){
   try{
     const snap=await FB.getDocs(FB.query(
       FB.collection(FB.db,'HydroPrimeJournal'),
-      FB.where('nom_entreprise','==',compagnie),
-      FB.orderBy('date_creation','desc')
+      FB.where('nom_entreprise','==',compagnie)
     ));
     const entries=[];
     snap.forEach(d=>entries.push({id:d.id,...d.data()}));
+    // Tri côté client par date décroissante
+    entries.sort((a,b)=>(b.date_creation?.seconds||0)-(a.date_creation?.seconds||0));
     const body=document.getElementById('journal-hp-body');
     if(!body)return;
     if(!entries.length){
@@ -1482,12 +1490,43 @@ function renderAccueilAdmin(){
         </div>
         <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);margin-left:auto;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </div>
+
+      <!-- Carte : Hydro-Prime -->
+      <div style="grid-column:1/-1;background:#fff;border-radius:10px;border-left:5px solid #f59e0b;box-shadow:0 2px 16px rgba(0,0,0,.08);padding:0;overflow:hidden">
+        <div style="padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--mist);cursor:pointer" onclick="switchPanel('comptabilite',null)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:1.8rem">💰</span>
+            <div>
+              <div style="font-family:var(--cond);font-size:1.05rem;font-weight:800;color:var(--charcoal)">Gestion Hydro-Prime</div>
+              <div style="font-size:.73rem;color:var(--slate);margin-top:2px">Tableau complet — HP cumulés, utilisés, restants, journal</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:20px;align-items:center">
+            <div style="text-align:center">
+              <div style="font-family:var(--cond);font-size:1.4rem;font-weight:800;color:#b45309">${(window.allHydroPrime||[]).reduce((s,h)=>s+(h.hp_cumules||0),0)}</div>
+              <div style="font-size:.65rem;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">HP Cumulés</div>
+            </div>
+            <div style="width:1px;height:30px;background:var(--mist)"></div>
+            <div style="text-align:center">
+              <div style="font-family:var(--cond);font-size:1.4rem;font-weight:800;color:#dc2626">${(window.allHydroPrime||[]).reduce((s,h)=>s+(h.hp_utilises||0),0)}</div>
+              <div style="font-size:.65rem;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">HP Utilisés</div>
+            </div>
+            <div style="width:1px;height:30px;background:var(--mist)"></div>
+            <div style="text-align:center">
+              <div style="font-family:var(--cond);font-size:1.4rem;font-weight:800;color:var(--green-dark)">${(window.allHydroPrime||[]).reduce((s,h)=>s+(h.hp_restants||0),0)}</div>
+              <div style="font-size:.65rem;color:var(--slate);text-transform:uppercase;letter-spacing:.5px">HP Restants</div>
+            </div>
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--mist);flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+      </div>
     </div>`;
 }
 
-// Filtre le tableau de suivi par assembleur depuis la carte inventaire
+// Filtre le tableau de suivi par assembleur depuis la carte inventaire (statut Fabriqué uniquement)
 function filterTableauByAsm(asmName){
   fAsm = asmName;
+  fSt = 'Fabriqué';
   asmView = null;
   switchPanel('tableau', null);
 }
@@ -2662,14 +2701,16 @@ function renderHydroPrimeTable(filtre){
           :`<span onclick="openHpPopup('${esc(r.nom_entreprise||'').replace(/'/g,"\\'")}','utilises',${utilises})" style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:#dc2626;cursor:pointer;border-radius:4px;padding:2px 8px;background:#fef2f2;transition:background .15s" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fef2f2'">${utilises}</span>`}
       </td>
       <td style="text-align:center">
-        <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
           <span onclick="openHpPopup('${esc(r.nom_entreprise||'').replace(/'/g,"\\'")}','restants',${utilises})" style="font-family:var(--cond);font-size:.95rem;font-weight:800;color:${restants>=5?'var(--green-dark)':'#92400e'};cursor:pointer;border-radius:4px;padding:2px 8px;background:${restants>=5?'#f0fdf4':'#fffbeb'};transition:background .15s" onmouseover="this.style.background='#bbf7d0'" onmouseout="this.style.background='${restants>=5?'#f0fdf4':'#fffbeb'}'">${restants}</span>${eligBadge}
+          ${restants>0&&!isE?`<button onclick="openUtiliserHpModalFromHP('${r.id}','${esc(r.nom_entreprise||'').replace(/'/g,'&#39;')}',${restants})" style="padding:2px 7px;border-radius:3px;border:1px solid var(--green);background:#f0fdf4;color:var(--green-dark);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">− Utiliser</button>`:''}
         </div>
       </td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <div style="flex:1;height:6px;background:var(--mist);border-radius:3px;overflow:hidden;min-width:60px"><div style="height:100%;background:${pct>80?'#dc2626':'#f59e0b'};width:${Math.min(pct,100)}%;border-radius:3px"></div></div>
           <span style="font-size:.72rem;color:var(--slate);min-width:30px">${pct}%</span>
+          <button onclick="openJournalHpModal('${r.id}','${esc(r.nom_entreprise||'').replace(/'/g,'&#39;')}')" style="padding:2px 7px;border-radius:3px;border:1px solid var(--blue);background:var(--blue-pale);color:var(--blue);font-family:var(--cond);font-size:10px;font-weight:700;cursor:pointer">📋</button>
         </div>
       </td>
       <td class="td-actions">
